@@ -33,24 +33,31 @@ Skill("superpowers:test-driven-development")
 Do NOT proceed until this skill is loaded. Follow its RED/GREEN/REFACTOR methodology for every task.
 
 ```bash
-# Find active PLAN.md
+# Find active PLAN.md (already refined by gss-brainstormer)
 source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
 cat "$GSD_PLAN_FILE"
+
+# Read brainstorm design doc for implementation context
+cat "$GSD_PHASE_DIR/BRAINSTORM_DOC.md" 2>/dev/null || echo "No brainstorm doc found"
 ```
 
 Check: are all tasks `[x]`? → Return DONE immediately.
 
+> **Note:** PLAN.md has already been refined by the gss-brainstormer gate with
+> implementation details, test stubs, and YAGNI cuts. Read BRAINSTORM_DOC.md
+> for the confirmed approach rationale before writing any test.
+
 ### Per unchecked `[ ]` task
 
 **RED phase:**
-- Write the failing test exactly as specified in the task
+- Write the failing test based on the task spec AND BRAINSTORM_DOC.md implementation notes
 - Run it: `npm test` / `pytest` / `go test`
 - Confirm it fails with expected error (NOT import/syntax error)
 - If import error → fix imports first, then confirm test logic fails
 
 **GREEN phase:**
 - Write MINIMAL implementation — only what makes this test pass
-- YAGNI: do not add anything the test doesn't require
+- YAGNI: the brainstormer already cut scope; do not re-add anything
 - Run tests: confirm this test passes, no regressions
 
 **REFACTOR phase:**
@@ -75,13 +82,17 @@ Move to next `[ ]` task.
 
 Stop immediately and return BLOCKED when:
 
-1. **Ambiguous spec** — cannot write a test without assuming something not in DECISIONS.md
-2. **Missing edge case** — discovered scenario not covered by any decision
+1. **Ambiguous spec** — cannot write a test without assuming something not in DECISIONS.md or BRAINSTORM_DOC.md
+2. **Missing edge case** — discovered scenario not covered by any decision or brainstorm note
 3. **Conflicting rules** — two decisions contradict, cannot implement both
 4. **Technical blocker** — library/API unavailable or incompatible with environment
-5. **Scope creep** — task requires building something outside this phase's objective
+5. **Scope creep** — task requires building something outside this milestone's objective
 
 Do NOT stop for: variable naming, file structure, import order, helper function names — decide these using best practices.
+
+> **Note:** Design questions (approach selection, architecture trade-offs) were
+> already resolved by the brainstorming gate. If BRAINSTORM_DOC.md and DECISIONS.md
+> together answer the question → make the decision and proceed.
 
 ## OUTPUT FORMAT
 

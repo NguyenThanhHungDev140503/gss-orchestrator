@@ -32,34 +32,39 @@ cat > "$OUT" << PROMPT
 \$test-driven-development
 \$verification-before-completion
 
-You are executing a development phase as part of GSS Orchestrator in Codex.
-The skill mentions above are intentional. There is no separate "invoke skill" command.
+You are executing a development milestone as part of GSS Orchestrator in Codex.
+The skill ids above are intentional. There is no separate "invoke skill" command.
 
 ━━ MISSION ━━
 Execute ALL unchecked [ ] tasks in PLAN.md using strict RED/GREEN/REFACTOR TDD.
 Completed [x] tasks are done — do not redo them.
+PLAN.md has already been refined by the Superpowers Brainstorming gate — read it carefully.
 
 ━━ GSTACK DECISIONS (authoritative) ━━
 $(cat "$DECISIONS_FILE" 2>/dev/null || echo "none")
 
+━━ BRAINSTORM DESIGN DOC (confirmed approach) ━━
+$(cat "$GSD_BRAINSTORM_DOC" 2>/dev/null || echo "none — read PLAN.md implementation hints directly")
+
 ━━ SHARED CONTEXT ━━
 $(cat "$SHARED_CTX" 2>/dev/null || echo "none")
 
-━━ PLAN.md ━━
+━━ PLAN.md (refined with implementation details) ━━
 $(cat "$PLAN_FILE")
-
-━━ AMBIGUITY HANDLING ━━
-Do not load \$brainstorming in this executor; it requires interactive approval and
-will deadlock autonomous execution.
-If PLAN.md or DECISIONS.md leaves a task underspecified such that you cannot write
-a correct failing test:
-  - Collect ALL questions into: $(dirname "$GSD_PLAN_FILE")/OPEN_QUESTIONS.md
-  - Format: Q: <question> | Options: A)... B)... C)...
-  - Output: <promise>PHASE_BLOCKED:QUESTIONS</promise>
-  - Stop — do not guess.
 
 ━━ TDD PROTOCOL ━━
 Per task: RED (failing test) → GREEN (minimal impl) → REFACTOR → verify → commit → mark [x]
+Use BRAINSTORM DESIGN DOC and GSTACK DECISIONS as implementation guide during RED phase.
+
+━━ AMBIGUITY HANDLING ━━
+Design questions were resolved by the brainstorming gate before this execution started.
+Do not load \$brainstorming here — it will deadlock autonomous execution.
+If BRAINSTORM_DOC + DECISIONS together answer the question → decide and proceed.
+Only block if a scenario is genuinely uncovered by both documents:
+  - Collect ALL remaining questions into: $(dirname "$GSD_PLAN_FILE")/OPEN_QUESTIONS.md
+  - Format: Q: <question> | Options: A)... B)... C)...
+  - Output: <promise>PHASE_BLOCKED:QUESTIONS</promise>
+  - Stop — do not guess.
 
 ━━ VERIFICATION GATE ━━
 Before outputting PHASE_COMPLETE, run the relevant full verification commands and

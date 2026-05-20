@@ -2,8 +2,8 @@
 name: gsd-gstack-sp-orchestrator
 description: >
   Full development orchestrator. Coordinates GSD, GStack, and Superpowers plugins
-  through a structured loop: analyze requirements → plan phases → review decisions →
-  execute with TDD → QA validate → dispatch next phase.
+  through a structured loop: plan milestones → review decisions → brainstorm design →
+  execute with TDD → QA validate → dispatch next milestone.
   Trigger with: "orchestrate", "start ralph loop", "run gss loop", "build this project",
   "start development loop", or any request to build a feature end-to-end with planning.
   Manages the full lifecycle automatically — do not invoke GSD, GStack, or Superpowers
@@ -49,24 +49,25 @@ cat .planning/GSS_STATE.json 2>/dev/null || echo '{"loop_state":"IDLE"}'
 ```
 
 ```
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
-                                        ↕
-                                   GSTACK_QA (blocking Qs from Superpowers)
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
+                                  ↑                  ↕                                         │
+                                  │           BLOCKED:DESIGN                                   │
+                                  │         (→ gss-reviewer                                    │
+                                  │           → back to BRAINSTORM)                            │
+                                  └────────────────────────────────────────────────────────────┘
+                                                   NEXT_PHASE loop
 ```
 
 ---
 
-## PHASE 0 — RESEARCH (trước khi GSD planning)
+## PHASE 0 — RESEARCH
 
 **Trigger:** `loop_state` is `IDLE`
 
-**Mục đích:** Thu thập technical context từ internet TRƯỜC khi GSD tạo plan.
-GSD runner sẽ nhận research findings làm input — không cần GSD dispatch research agents nội bộ.
+Pre-planning web research feeds GSD with a compact `RESEARCH.md` so it does not need
+to dispatch nested research agents (which hit subagent depth limits).
 
-Điều này giải quyết giới hạn subagent nesting: research chạy ở depth 1
-(orchestrator → gss-researcher), không cần depth 2 (orchestrator → gsd-runner → research agent).
-
-### Step 0.1 — Lưu requirements
+### Step 0.1 — Save requirements
 
 ```bash
 mkdir -p .planning
@@ -75,25 +76,39 @@ cat > .planning/REQUIREMENTS.md << 'REQEOF'
 REQEOF
 ```
 
-### Step 0.2 — Dispatch gss-researcher (Task tool)
+### Step 0.2 — Dispatch gss-researcher
 
-Use Task tool to invoke gss-researcher subagent:
+Use the **Agent/Task tool** to dispatch `gss-researcher` (NOT the Skill tool):
 
 ```
-Task(
-  subagent: gss-researcher,
-  prompt: "Research technical context for this project.
-           Requirements are at .planning/REQUIREMENTS.md.
-           Use WebSearch and WebFetch directly.
-           Write findings to .planning/RESEARCH.md.
-           Return RESEARCH_COMPLETE when done."
+Agent(
+  subagent_type: "gss-researcher",
+  prompt: "Run pre-planning research for this project.
+
+           Requirements (from .planning/REQUIREMENTS.md):
+           [paste requirements]
+
+           Use WebSearch and WebFetch directly (you have those tools — do
+           NOT try to spawn subagents). Cover tech stack validation,
+           architecture patterns, implementation specifics, and dependency
+           risks relevant to these requirements. Write a compact
+           .planning/RESEARCH.md (max 500 lines) and output RESEARCH_COMPLETE
+           plus a 3-line summary. Do not start planning."
 )
 ```
 
-gss-researcher dùng WebSearch và WebFetch trực tiếp — không spawn subagent.
-Sau khi Task complete, `.planning/RESEARCH.md` đã có sẵn.
+Wait for `RESEARCH_COMPLETE`.
 
-### Step 0.3 — Update state
+### Step 0.3 — Verify research output
+
+```bash
+ls -la .planning/RESEARCH.md
+head -20 .planning/RESEARCH.md
+```
+
+If `.planning/RESEARCH.md` is missing or empty → re-dispatch, do not proceed.
+
+### Step 0.4 — Update state
 
 ```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING"
@@ -103,23 +118,25 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING
 
 ---
 
-## PHASE 1 — PLANNING (GSD với research context)
+## PHASE 1 — PLANNING
 
-**Trigger:** `loop_state` is `PLANNING`
+**Trigger:** `loop_state` is `IDLE`
 
-GSD không cần dispatch research agents nữa — research đã xong ở Phase 0.
-Inject research findings vào GSD invocation:
+GSD owns the full planning flow: interview → parallel research agents → roadmap → user approval → PLAN.md draft for first milestone.
+The orchestrator does NOT inject research — GSD dispatches its own research agents internally.
 
-### Step 1.1 — Đọc research findings
+### Step 1.1 — Save requirements
 
-**Trigger (original):** `loop_state` is `IDLE` (now handled by Phase 0)
+```bash
+mkdir -p .planning
+cat > .planning/REQUIREMENTS.md << 'REQEOF'
+[paste user's full requirements / SRS here]
+REQEOF
+```
 
-### Step 1.2 — Dispatch gss-gsd-runner subagent
+### Step 1.2 — Dispatch gss-gsd-runner (mode: PLANNING)
 
-Use the **Agent/Task tool** to dispatch `gss-gsd-runner` (NOT the Skill tool).
-The runner loads GSD via Skill tool inside its own context, follows the full
-workflow, and returns a structured JSON result. The orchestrator never sees
-GSD prose.
+Use the **Agent/Task tool** to dispatch `gss-gsd-runner` (NOT the Skill tool):
 
 ```
 Agent(
@@ -129,32 +146,29 @@ Agent(
            Requirements (from .planning/REQUIREMENTS.md):
            [paste requirements]
 
-           Research findings (from .planning/RESEARCH.md):
-           [paste research summary]
-
-           Run the full GSD planning workflow. Invoke the appropriate
-           GSD skill via the Skill tool, follow it to completion, and
-           return PLANNING_COMPLETE JSON when .planning/ROADMAP.md and
-           the first phase PLAN.md exist on disk."
+           Run the full GSD planning workflow including research dispatch.
+           Invoke the appropriate GSD skill via the Skill tool, follow it
+           to completion — including any AskUserQuestion gates (answer from
+           requirements when possible) — and return PLANNING_COMPLETE JSON
+           when .planning/ROADMAP.md and the first milestone PLAN.md exist
+           on disk."
 )
 ```
 
-Wait for the subagent to return JSON. Parse `current_phase` and `plan_path`.
+Wait for JSON. Parse `current_phase` and `plan_path`.
 If `status` is `FAILED`, surface the reason to the user and stop.
 
-### Step 1.2b — Verify GSD output (YOU do this after subagent returns)
+### Step 1.3 — Verify GSD output
 
-After GSD finishes its complete flow, control returns to YOU:
 ```bash
 ls .planning/
 cat .planning/STATE.md
-cat .planning/ROADMAP.md
+cat .planning/ROADMAP.md | head -30
 ```
 
-Extract current phase from STATE.md.
-If `.planning/` was not created → re-invoke GSD, do not proceed.
+If `.planning/` was not created → re-invoke, do not proceed.
 
-### Step 1.3 — Update state (YOU run this script)
+### Step 1.4 — Update state
 
 ```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>"
@@ -198,12 +212,7 @@ Agent(
 
 Wait for JSON. The subagent has already logged decisions to DECISIONS.md.
 
-### Step 2.3 — Extract CEO decisions from JSON (no script call needed)
-
-Read `decisions[]` from the returned JSON. The subagent already appended them
-to DECISIONS.md. No need to call `log_decision.sh` here.
-
-### Step 2.4 — Dispatch gss-reviewer for Engineering review
+### Step 2.3 — Dispatch gss-reviewer for Engineering review
 
 ```
 Agent(
@@ -222,15 +231,13 @@ Agent(
 )
 ```
 
-### Step 2.5 — Write EXEC_PROMPT and advance state
+### Step 2.4 — Advance to brainstorm gate
 
 ```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
   "eng-review" "[extracted engineering decisions]"
 
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt.sh
-
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_BRAINSTORM"
 
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
 ```
@@ -239,21 +246,97 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
 
 ---
 
-## PHASE 3 — EXECUTE WITH SUPERPOWERS
+## PHASE 3 — SUPERPOWERS BRAINSTORMING GATE
+
+**Trigger:** `loop_state` is `SP_BRAINSTORM`
+
+This is a **HARD GATE**. Execution CANNOT start until design is confirmed here.
+The brainstormer reads codebase + DECISIONS.md, proposes 2-3 approaches with YAGNI
+filter, and refines PLAN.md with implementation details.
+
+### Step 3.1 — Dispatch gss-brainstormer
+
+Use **Agent/Task tool**:
+
+```
+Agent(
+  subagent_type: "gss-brainstormer",
+  prompt: "Run the Superpowers Brainstorming gate for the current milestone.
+
+           Current milestone: [phase id from STATE.md]
+           Decisions context: .planning/phases/<phase>/DECISIONS.md
+           PLAN.md draft: .planning/phases/<phase>/PLAN.md
+
+           Analyze the milestone scope using Superpowers brainstorming.
+           Propose 2-3 implementation approaches with YAGNI filter.
+           Confirm the best approach from DECISIONS.md constraints.
+           Refine PLAN.md in place with implementation details.
+           Write BRAINSTORM_DOC.md.
+           Return DESIGN_CONFIRMED JSON or BLOCKED JSON."
+)
+```
+
+### Step 3.2 — Parse brainstorm result
+
+**If `DESIGN_CONFIRMED`:**
+```bash
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt.sh
+
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+```
+→ Proceed to PHASE 4
+
+**If `BLOCKED` (design gate triggered):**
+```bash
+# Surface the design question to GStack
+```
+
+Dispatch gss-reviewer to resolve the design question:
+```
+Agent(
+  subagent_type: "gss-reviewer",
+  prompt: "Review type: QUESTION_ROUTING
+
+           Design question from Superpowers brainstorming (pre-execution gate):
+           [paste question from BLOCKED JSON]
+
+           Approaches considered by brainstormer:
+           [paste approaches_considered from BLOCKED JSON]
+
+           Classify the question (PRODUCT/ARCH/TECH), invoke the matching
+           GStack skill via Skill tool, extract the single decision that
+           unblocks the design gate, and return JSON."
+)
+```
+
+After receiving decision:
+```bash
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+  "brainstorm-gate" "[decision from reviewer]"
+
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decision]"
+```
+→ Return to Step 3.1 (re-dispatch gss-brainstormer with updated DECISIONS.md)
+
+---
+
+## PHASE 4 — EXECUTE WITH SUPERPOWERS TDD
 
 **Trigger:** `loop_state` is `SP_EXECUTING`
 
-This phase runs Superpowers in **complete isolation** via Task tool.
-Superpowers MUST be explicitly invoked inside the task.
+PLAN.md has already been refined by the brainstorming gate.
+This phase runs Superpowers TDD in **complete isolation** via Task tool.
 
-### Step 3.1 — Build task prompt
+### Step 4.1 — Build task prompt
 
 ```bash
 source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
 EXEC_CONTENT=$(cat "$GSD_EXEC_PROMPT")
 ```
 
-### Step 3.2 — Launch Task with mandatory Superpowers invocation
+### Step 4.2 — Launch gss-executor Task
 
 Use Task tool with this prompt:
 
@@ -261,135 +344,81 @@ Use Task tool with this prompt:
 You are a TDD execution agent inside GSS Orchestrator.
 
 YOUR FIRST ACTION — MANDATORY:
-Invoke the Superpowers skill now: invoke skill superpowers
+Invoke the Superpowers skill now: invoke skill superpowers:test-driven-development
 
-After Superpowers skill loads, use its brainstorming capability to analyze
-each task before coding. Follow Superpowers' TDD methodology strictly.
+After Superpowers skill loads, follow its TDD methodology strictly.
+PLAN.md has already been refined with implementation details — read it from disk.
 
 === EXECUTION CONTEXT ===
 [paste $EXEC_CONTENT here]
 === END CONTEXT ===
 
 WORKFLOW (do not deviate):
-1. invoke skill superpowers  ← DO THIS FIRST
+1. invoke skill superpowers:test-driven-development  ← DO THIS FIRST
 2. For each unchecked [ ] task in PLAN.md:
-   a. Superpowers brainstorm: clarify requirements, surface questions
-   b. If questions arise: write them to OPEN_QUESTIONS.md, then output:
-      <promise>PHASE_BLOCKED:QUESTIONS</promise>
-      STOP — do not guess, do not continue.
-   c. RED: write failing test → run → confirm fail
-   d. GREEN: minimal implementation → run → confirm pass
-   e. REFACTOR: clean code → run → confirm still pass
-   f. git commit -m "<message from task spec>"
-   g. Mark task [x] in PLAN.md
+   a. RED: write failing test → run → confirm fail
+   b. GREEN: minimal implementation → run → confirm pass
+   c. REFACTOR: clean code → run → confirm still pass
+   d. git commit -m "<message from task spec>"
+   e. Mark task [x] in PLAN.md
 3. When ALL tasks are [x] and tests pass:
    Output: <promise>PHASE_COMPLETE</promise>
+4. If task spec is ambiguous (not covered by BRAINSTORM_DOC or DECISIONS):
+   Collect questions in OPEN_QUESTIONS.md
+   Output: <promise>PHASE_BLOCKED:QUESTIONS</promise>
+   STOP — do not guess.
 ```
 
-### Step 3.3 — Parse Task result (YOU do this)
-
-After Task tool returns, check result:
+### Step 4.3 — Parse Task result
 
 **If `PHASE_COMPLETE`:**
 ```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_QA"
 ```
-→ Proceed to PHASE 4
+→ Proceed to PHASE 5
 
 **If `PHASE_BLOCKED:QUESTIONS`:**
 ```bash
 cat .planning/phases/<phase>/OPEN_QUESTIONS.md
-```
-→ Proceed to PHASE 3b
-
-**If no signal (implicit done — all tasks [x]):**
-```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
-grep -c "^\- \[ \]" "$GSD_PLAN_FILE" && echo "still pending" || echo "all done"
-```
-If all done → treat as PHASE_COMPLETE → Proceed to PHASE 4
-
-**If Task tool unavailable:** Run fallback:
-```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/run_phase.sh
-# Check exit code: 0=done, 1=blocked, 2=max-iter
-```
-
-### Phase 3b — Route Superpowers questions to GStack
-
-When `PHASE_BLOCKED:QUESTIONS`:
-
-**Step 3b.1 — Classify and route each question**
-```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/route_question.sh \
   "$(cat .planning/phases/<phase>/OPEN_QUESTIONS.md)"
 ```
 
-**Step 3b.2 — Dispatch gss-reviewer to answer questions**
+Dispatch gss-reviewer to answer, inject answer, re-launch Task.
+(Same pattern as Phase 3 question routing.)
 
-Use **Agent/Task tool** (NOT Skill tool):
-
-```
-Agent(
-  subagent_type: "gss-reviewer",
-  prompt: "Review type: QUESTION_ROUTING
-
-           Questions from Superpowers brainstorming:
-           [paste OPEN_QUESTIONS.md content]
-
-           Routing hint (from route_question.sh):
-           [paste classification output]
-
-           For each question, classify (PRODUCT/ARCH/TECH/QA/INFRA),
-           invoke the matching GStack skill via Skill tool, follow it
-           to completion, then return JSON with the unblocking decision."
-)
-```
-
-**Step 3b.3 — Inject answers and retry (YOU do this)**
+**If no signal — check implicit done:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
-  "sp-questions" "[extracted answers]"
-
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh \
-  "[extracted answers]"
-
-# Clear questions file
-> .planning/phases/<phase>/OPEN_QUESTIONS.md
+source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+grep -c "^\- \[ \]" "$GSD_PLAN_FILE" && echo "still pending" || echo "all done"
 ```
-→ Return to Step 3.2 (re-launch Task with updated EXEC_PROMPT)
+If all done → treat as PHASE_COMPLETE → Proceed to PHASE 5
 
 ---
 
-## PHASE 4 — QA VALIDATION
+## PHASE 5 — QA VALIDATION
 
 **Trigger:** `loop_state` is `GSTACK_QA`
 
-### Step 4.1 — Dispatch gss-qa subagent
-
-Use **Agent/Task tool**. The `gss-qa` subagent runs the test suite, reads
-acceptance criteria, and returns a compact verdict JSON.
+### Step 5.1 — Dispatch gss-qa subagent
 
 ```
 Agent(
   subagent_type: "gss-qa",
-  prompt: "Validate the current phase against its acceptance criteria.
+  prompt: "Validate the current milestone against its acceptance criteria.
            Read $GSD_PLAN_FILE for criteria, run the project's test
            suite, check git log for commits, and return the QA verdict
            JSON. Do not return test output — only the verdict."
 )
 ```
 
-Wait for JSON. Do NOT use the Skill tool here — `gss-qa` already encapsulates
-the QA workflow and only emits PASSED/FAILED JSON.
-
-### Step 4.2 — Parse QA result (YOU do this)
+### Step 5.2 — Parse QA result
 
 **If `STATUS: PASSED`:**
 ```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSD_DISPATCH"
 ```
-→ Proceed to PHASE 5
+→ Proceed to PHASE 6
 
 **If `STATUS: FAILED`:**
 ```bash
@@ -397,44 +426,39 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh \
   "QA FAILED: [paste failures[] from gss-qa JSON]"
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
 ```
-→ Return to PHASE 3 (re-dispatch gss-executor)
+→ Return to PHASE 4 (re-dispatch gss-executor with failure context)
 
 ---
 
-## PHASE 5 — DISPATCH
+## PHASE 6 — DISPATCH NEXT MILESTONE
 
 **Trigger:** `loop_state` is `GSD_DISPATCH`
 
-### Step 5.1 — Dispatch gss-gsd-runner for next phase
-
-Use **Agent/Task tool** (NOT Skill tool):
+### Step 6.1 — Dispatch gss-gsd-runner for next milestone
 
 ```
 Agent(
   subagent_type: "gss-gsd-runner",
   prompt: "Mode: DISPATCH
 
-           Current phase complete: [phase name]
-           Completed phases: [list from GSS_STATE.json]
+           Current milestone complete: [milestone name]
+           Completed milestones: [list from GSS_STATE.json]
 
-           Read .planning/ROADMAP.md and .planning/STATE.md, determine
-           the next unplanned phase, invoke gsd-plan-phase via Skill
-           tool to create its PLAN.md, then return JSON with status
-           NEXT_PHASE / DELIVERED."
+           Invoke gsd-complete-milestone via Skill tool to mark current
+           milestone done, then invoke gsd-plan-phase for the next
+           unplanned milestone. Return JSON with status NEXT_PHASE or DELIVERED."
 )
 ```
 
-Wait for JSON.
-
-### Step 5.2 — Act on GSD response (YOU do this)
+### Step 6.2 — Act on dispatch response
 
 **If `NEXT_PHASE: <id>`:**
 ```bash
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_shared_context.sh
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<next-phase-id>"
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<next-milestone-id>"
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
 ```
-→ Return to PHASE 2 with new phase
+→ Return to PHASE 2 with new milestone
 
 **If `DELIVERED`:**
 ```bash
@@ -450,27 +474,45 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
 
 2. **Subagent dispatch, not inline Skill invocation.** Never call the `Skill`
    tool directly on GSD/GStack/Superpowers from the orchestrator context.
-   Always dispatch through a wrapper subagent (`gss-gsd-runner`,
-   `gss-reviewer`, `gss-executor`, `gss-qa`, `gss-researcher`) using
-   Agent/Task tool. The subagent handles Skill invocation inside its own
-   isolated context and returns compact JSON.
+   Always dispatch through a wrapper subagent (`gss-gsd-runner`, `gss-reviewer`,
+   `gss-brainstormer`, `gss-executor`, `gss-qa`) using Agent/Task tool.
+   The subagent handles Skill invocation inside its own isolated context and
+   returns compact JSON.
 
 3. **You parse JSON, not prose.** Wrapper subagents return structured JSON
    with predictable fields (`status`, `decisions[]`, `current_phase`, etc.).
    Read those fields directly. Do not parse free-form skill output.
 
-4. **Superpowers runs inside gss-executor ONLY.** Never invoke Superpowers
-   inline. The `gss-executor` subagent is the sole execution boundary.
+4. **Brainstorming gate is mandatory.** Never skip SP_BRAINSTORM and go
+   directly to SP_EXECUTING. The design gate ensures PLAN.md is implementation-
+   ready before any code is written.
 
-5. **Scripts are deterministic, Claude is not.** Use scripts for state
-   updates, file writes, and path resolution. Subagents update DECISIONS.md
-   themselves; the orchestrator only updates `GSS_STATE.json` and triggers
-   checkpoints.
+5. **Superpowers TDD runs inside gss-executor ONLY.** Never invoke
+   `superpowers:test-driven-development` inline.
 
-6. **Context hygiene after every subagent dispatch:**
+6. **Scripts are deterministic, Claude is not.** Use scripts for state updates,
+   file writes, and path resolution.
+
+7. **Context hygiene after every subagent dispatch:**
    ```bash
    bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
    ```
+
+---
+
+## FILE COMMUNICATION CONTRACT
+
+GSD and Superpowers communicate through these files:
+
+| File | Written by | Read by |
+|------|-----------|---------|
+| `REQUIREMENTS.md` | Orchestrator | gss-gsd-runner (GSD) |
+| `ROADMAP.md` | gss-gsd-runner (GSD) | Orchestrator, gss-reviewer |
+| `PLAN.md` (draft) | gss-gsd-runner (GSD) | gss-brainstormer |
+| `DECISIONS.md` | gss-reviewer (GStack) | gss-brainstormer, gss-executor |
+| `BRAINSTORM_DOC.md` | gss-brainstormer | gss-executor (via EXEC_PROMPT) |
+| `PLAN.md` (refined) | gss-brainstormer | gss-executor |
+| `EXEC_PROMPT.md` | write_exec_prompt.sh | gss-executor |
 
 ---
 
@@ -478,7 +520,7 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
 
 ```bash
 cat .planning/GSS_STATE.json    # current loop_state
-cat .planning/STATE.md          # current phase
+cat .planning/STATE.md          # current milestone
 cat .planning/DECISIONS.md | tail -30  # recent decisions
 ```
 

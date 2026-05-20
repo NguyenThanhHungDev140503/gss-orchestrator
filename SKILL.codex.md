@@ -2,8 +2,8 @@
 name: gsd-gstack-sp-orchestrator
 description: >
   Full development orchestrator for Codex. Coordinates GSD planning, GStack reviews,
-  and Superpowers-style TDD execution through a structured loop:
-  research → plan → review → execute → QA → dispatch.
+  Superpowers Brainstorming gate, and TDD execution through a structured loop:
+  plan milestones → review decisions → brainstorm design → execute → QA → dispatch.
   Trigger with: "orchestrate", "start gss loop", "build this project with planning",
   "run the full development loop". Uses Codex-native subagents plus concrete skill IDs.
 ---
@@ -61,6 +61,13 @@ $plan-eng-review
 [the rest of the instructions]
 ```
 
+Brainstorming gate subagent:
+```text
+$brainstorming
+$writing-plans
+[the rest of the instructions]
+```
+
 Execution subagent:
 ```text
 $test-driven-development
@@ -75,7 +82,13 @@ Use only concrete skill ids that exist in Codex.
 ## STATE MACHINE
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
+                                  ↑                 ↕                                          │
+                                  │          BLOCKED:DESIGN                                    │
+                                  │        (→ GStack routing                                   │
+                                  │          → retry brainstorm)                               │
+                                  └────────────────────────────────────────────────────────────┘
+                                                  NEXT_PHASE loop
 ```
 
 ---
@@ -83,6 +96,9 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA 
 ## PHASE 0 — RESEARCH
 
 **Trigger:** `loop_state` is `IDLE`
+
+Pre-planning web research feeds GSD with a compact `RESEARCH.md` so it does not
+need to dispatch nested research agents.
 
 Save requirements:
 ```bash
@@ -92,73 +108,78 @@ cat > .planning/REQUIREMENTS.md << 'EOF'
 EOF
 ```
 
-Spawn one subagent for research:
+Spawn one researcher subagent. Its **initial message must begin with**:
 ```text
-Spawn one subagent to research technical context for this project.
-The subagent should:
-1. Read .planning/REQUIREMENTS.md
-2. Use web search to find: best libraries, architecture patterns, known pitfalls
-3. Write findings to .planning/RESEARCH.md in this format:
+You are gss-researcher.
 
-## Stack Recommendations
-- [library]: [reason, version]
+Use WebSearch and WebFetch directly — you have those tools.
+Do NOT try to spawn subagents.
 
-## Architecture Decisions
-- [pattern]: [trade-off]
+Read .planning/REQUIREMENTS.md, gather:
+- Tech stack validation (best libraries/frameworks, versions, deprecations)
+- Architecture patterns (production evidence, trade-offs)
+- Implementation specifics (API/schema/auth/security/perf)
+- Dependency risks (compatibility, breaking changes)
 
-## Avoid
-- [anti-pattern]: [reason]
+Write .planning/RESEARCH.md (max 500 lines, actionable decisions only).
 
-When done, output the single word: RESEARCH_COMPLETE
+When finished, output only:
+RESEARCH_COMPLETE
+[3-line summary of most important findings]
 ```
 
-After subagent outputs `RESEARCH_COMPLETE`:
+After `RESEARCH_COMPLETE`:
 ```bash
+ls -la .planning/RESEARCH.md
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING"
 ```
+
+→ PHASE 1
 
 ---
 
 ## PHASE 1 — PLANNING
 
-**Trigger:** `loop_state` is `PLANNING`
+**Trigger:** `loop_state` is `IDLE`
 
-Read research:
+GSD handles the full planning flow internally — interview, research agents, roadmap, PLAN.md draft.
+The orchestrator does NOT inject research.
+
+Save requirements:
 ```bash
-cat .planning/RESEARCH.md
+mkdir -p .planning
+cat > .planning/REQUIREMENTS.md << 'EOF'
+[paste user's requirements here]
+EOF
 ```
 
-Spawn one planning subagent.
-Its **initial message must begin with**:
+Spawn one planning subagent. Its **initial message must begin with**:
 ```text
 $gsd-new-project --auto
-Initialize or refresh the planning artifacts for this project.
+Initialize planning artifacts for this project.
 
 Requirements:
 [user requirements]
 
-Research findings already completed — use these first and do not redo research
-unless a required fact is missing:
-[paste .planning/RESEARCH.md]
-
-If planning artifacts already exist, update them instead of replacing unrelated work.
+Run the full GSD workflow including research dispatch and roadmap creation.
+Answer any AskUserQuestion gates using the requirements above when possible.
 When finished, output only:
-PLANNING_DONE: [current phase name]
+PLANNING_DONE: [current milestone name]
 ```
 
 After subagent outputs `PLANNING_DONE`:
 ```bash
 cat .planning/STATE.md
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<phase>"
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>"
 ```
 
 ---
 
-## PHASE 2 — REVIEW
+## PHASE 2 — GSTACK REVIEW
 
 **Trigger:** `loop_state` is `GSTACK_REVIEW`
 
-Read phase plan:
+Read milestone plan:
 ```bash
 source .agents/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
 cat "$GSD_PLAN_FILE" 2>/dev/null || cat .planning/ROADMAP.md
@@ -166,11 +187,10 @@ cat "$GSD_PLAN_FILE" 2>/dev/null || cat .planning/ROADMAP.md
 
 ### CEO Review
 
-Spawn one review subagent.
-Its **initial message must begin with**:
+Spawn one review subagent. Its **initial message must begin with**:
 ```text
 $plan-ceo-review
-Review this phase plan in hold-scope mode.
+Review this milestone plan. Focus on user value, scope, acceptance criteria, risk.
 
 Plan to review:
 [paste plan content]
@@ -183,7 +203,7 @@ DECISIONS_END
 CEO_DONE
 ```
 
-After `CEO_DONE`, extract numbered decisions and log:
+After `CEO_DONE`, log decisions:
 ```bash
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
   "ceo-review" "[extracted numbered decisions]"
@@ -191,11 +211,10 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
 
 ### Engineering Review
 
-Spawn one review subagent.
-Its **initial message must begin with**:
+Spawn one review subagent. Its **initial message must begin with**:
 ```text
 $plan-eng-review
-Review this phase plan for architecture, dependencies, constraints, and testability.
+Review this milestone plan for architecture, dependencies, constraints, testability.
 
 Plan to review:
 [paste plan content]
@@ -216,16 +235,83 @@ After `ENG_DONE`:
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
   "eng-review" "[extracted numbered decisions]"
 
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt_codex.sh
-
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_BRAINSTORM"
 
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
 ```
 
 ---
 
-## PHASE 3 — EXECUTE
+## PHASE 3 — SUPERPOWERS BRAINSTORMING GATE
+
+**Trigger:** `loop_state` is `SP_BRAINSTORM`
+
+This is a **HARD GATE** — execution cannot start until design is confirmed here.
+The brainstormer reads codebase + DECISIONS.md, proposes 2-3 approaches with YAGNI
+filter, confirms the best approach, then refines PLAN.md with implementation details.
+
+Spawn one brainstorming subagent. Its **initial message must begin with**:
+```text
+$brainstorming
+$writing-plans
+
+You are the design gate for GSS Orchestrator. Your job:
+1. Read codebase structure + DECISIONS.md + PLAN.md draft
+2. Propose 2-3 implementation approaches for this milestone (apply YAGNI filter)
+3. Confirm the best approach using DECISIONS.md constraints (HARD GATE — do not guess)
+4. Refine PLAN.md in place with implementation details and test stubs
+5. Write BRAINSTORM_DOC.md with the confirmed approach rationale
+
+Current milestone: [milestone id from STATE.md]
+Decisions: .planning/phases/<milestone>/DECISIONS.md
+PLAN.md draft: .planning/phases/<milestone>/PLAN.md
+
+If no approach can be confirmed from DECISIONS.md alone, output:
+BRAINSTORM_BLOCKED: [question with 2-3 options A) B) C)]
+STOP.
+
+If design is confirmed, output:
+BRAINSTORM_DONE: [selected approach name]
+```
+
+After subagent output:
+
+**If `BRAINSTORM_DONE`:**
+```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt_codex.sh
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+```
+→ PHASE 4
+
+**If `BRAINSTORM_BLOCKED`:**
+
+Route the design question to GStack. Spawn one review subagent:
+```text
+$plan-eng-review
+Answer this design question from the Superpowers brainstorming gate.
+
+Question:
+[paste BRAINSTORM_BLOCKED question]
+
+Return only:
+ROLE: ENG
+DECISION: [single clear answer]
+QA_ANSWER_DONE
+```
+(Use `$plan-ceo-review` if question is about product scope or acceptance criteria.)
+
+After `QA_ANSWER_DONE`:
+```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+  "brainstorm-gate" "[role + decision]"
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decision]"
+```
+→ Re-spawn brainstorming subagent (return to top of Phase 3)
+
+---
+
+## PHASE 4 — EXECUTE (HEADLESS TDD)
 
 **Trigger:** `loop_state` is `SP_EXECUTING`
 
@@ -237,9 +323,7 @@ cat "$GSD_EXEC_PROMPT"
 ```
 
 Spawn one execution subagent and use the full contents of `EXEC_PROMPT.md`
-as the **initial message**.
-
-That prompt must start with:
+as the **initial message**. That prompt already starts with:
 ```text
 $test-driven-development
 $verification-before-completion
@@ -256,73 +340,33 @@ After subagent completes:
 ```bash
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_QA"
 ```
-→ PHASE 4
+→ PHASE 5
 
 **If output contains `PHASE_BLOCKED:`:**
-Extract the question → PHASE 3b
+Extract the question → route via GStack (same pattern as Phase 3 routing) → re-spawn executor
 
 **If no signal** — check implicit done:
 ```bash
 grep -c "^\- \[ \]" "$GSD_PLAN_FILE" && echo "tasks pending" || echo "all done"
 ```
 
-### Phase 3b — Route Blocked Question
+### Phase 4b — Route Blocked Question
 
 ```bash
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/route_question.sh "<question>"
 ```
 
-Then route by role:
-
-If role is `CEO`, spawn one subagent whose initial message begins with:
-```text
-$plan-ceo-review
-Answer this blocked execution question with one clear decision.
-
-Question:
-[question with options]
-
-Return only:
-ROLE: CEO
-DECISION: [single clear answer]
-QA_ANSWER_DONE
-```
-
-If role is `ENG`, spawn one subagent whose initial message begins with:
-```text
-$plan-eng-review
-Answer this blocked execution question with one clear implementation decision.
-
-Question:
-[question with options]
-
-Return only:
-ROLE: ENG
-DECISION: [single clear answer]
-QA_ANSWER_DONE
-```
-
-If role is `QA`, spawn one plain validation subagent (no GStack umbrella skill) and instruct it to:
-- read `PLAN.md` and `DECISIONS.md`
-- answer the question conservatively
-- return only:
-```text
-ROLE: QA
-DECISION: [single clear answer]
-QA_ANSWER_DONE
-```
-
-After `QA_ANSWER_DONE`:
+Route by role (CEO or ENG), spawn GStack subagent, receive `QA_ANSWER_DONE`:
 ```bash
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
   "sp-blocked" "[role + decision]"
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decision]"
 ```
-→ Re-spawn execution subagent (return to Phase 3)
+→ Re-spawn execution subagent (return to Phase 4)
 
 ---
 
-## PHASE 4 — QA VALIDATION
+## PHASE 5 — QA VALIDATION
 
 **Trigger:** `loop_state` is `GSTACK_QA`
 
@@ -331,17 +375,14 @@ source .agents/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
 grep -A10 -i "acceptance criteria" "$GSD_PLAN_FILE" | head -15
 ```
 
-Spawn one plain validation subagent.
-Do **not** use `$qa` here; that skill is for interactive web-app QA/fix loops,
-not phase acceptance validation.
-
-Validation subagent instructions:
+Spawn one plain validation subagent (no GStack skill here):
 ```text
-Validate this completed phase against PLAN.md acceptance criteria.
+Validate this completed milestone against PLAN.md acceptance criteria.
 
 Read:
 - PLAN.md
 - DECISIONS.md
+- BRAINSTORM_DOC.md
 - shared_context.md
 
 Then:
@@ -361,7 +402,7 @@ After `QA_DONE`:
 ```bash
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSD_DISPATCH"
 ```
-→ PHASE 5
+→ PHASE 6
 
 **If `QA_STATUS: FAILED`:**
 ```bash
@@ -372,24 +413,25 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECU
 
 ---
 
-## PHASE 5 — DISPATCH
+## PHASE 6 — DISPATCH NEXT MILESTONE
 
 **Trigger:** `loop_state` is `GSD_DISPATCH`
 
-Spawn one dispatch subagent.
-Its **initial message must begin with**:
+Spawn one dispatch subagent. Its **initial message must begin with**:
 ```text
+$gsd-complete-milestone
 $gsd-progress --next --force
-Advance the planning workflow after this phase is complete.
 
-Completed phases:
-[list from GSS_STATE.json]
+Complete the current milestone and advance to the next.
+
+Completed milestone: [milestone name]
+Completed milestones so far: [list from GSS_STATE.json]
 
 Roadmap:
 [paste ROADMAP.md]
 
 Return only one of:
-NEXT_PHASE: [phase-id]
+NEXT_PHASE: [milestone-id]
 DELIVERED
 ```
 
@@ -420,6 +462,20 @@ After each phase, run:
 ```bash
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --phase
 ```
+
+---
+
+## FILE COMMUNICATION CONTRACT
+
+| File | Written by | Read by |
+|------|-----------|---------|
+| `REQUIREMENTS.md` | Orchestrator | Planning subagent (GSD) |
+| `ROADMAP.md` | Planning subagent (GSD) | Orchestrator, review subagents |
+| `PLAN.md` (draft) | Planning subagent (GSD) | Brainstorming gate subagent |
+| `DECISIONS.md` | Review subagents (GStack) | Brainstorming gate, executor |
+| `BRAINSTORM_DOC.md` | Brainstorming gate subagent | Executor (via EXEC_PROMPT) |
+| `PLAN.md` (refined) | Brainstorming gate subagent | Executor |
+| `EXEC_PROMPT.md` | write_exec_prompt_codex.sh | Executor subagent |
 
 ---
 

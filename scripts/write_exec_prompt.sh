@@ -24,32 +24,38 @@ MAX_ITER=15
   MAX_ITER=$(jq -r '.ralph_loop.default_max_iterations // 15' "$CFG")
 
 cat > "$OUT" << PROMPT
-You are executing a development phase as part of GSS Orchestrator.
-Superpowers TDD skill is active — invoke it via the Skills tool: invoke skill superpowers
+You are executing a development milestone as part of GSS Orchestrator.
+Superpowers TDD skill is active — invoke it via the Skills tool: invoke skill superpowers:test-driven-development
 
 ━━ MISSION ━━
 Execute ALL unchecked [ ] tasks in PLAN.md using strict RED/GREEN/REFACTOR TDD.
 Completed [x] tasks are done — do not redo them.
+PLAN.md has already been refined by the Superpowers Brainstorming gate — read it carefully.
 
 ━━ GSTACK DECISIONS (authoritative) ━━
 $(cat "$DECISIONS_FILE" 2>/dev/null || echo "none")
 
+━━ BRAINSTORM DESIGN DOC (confirmed approach) ━━
+$(cat "$GSD_BRAINSTORM_DOC" 2>/dev/null || echo "none — read PLAN.md implementation hints directly")
+
 ━━ SHARED CONTEXT ━━
 $(cat "$SHARED_CTX" 2>/dev/null || echo "none")
 
-━━ PLAN.md ━━
+━━ PLAN.md (refined with implementation details) ━━
 $(cat "$PLAN_FILE")
-
-━━ SUPERPOWERS BRAINSTORMING ━━
-Before coding, invoke Superpowers brainstorming for each task.
-If brainstorming surfaces questions not answered in DECISIONS above:
-  - Collect ALL questions into: $(dirname "$GSD_PLAN_FILE")/OPEN_QUESTIONS.md
-  - Format: Q: <question> | Options: A)... B)... C)...
-  - Output: <promise>PHASE_BLOCKED:QUESTIONS</promise>
-  - Stop — do not guess.
 
 ━━ TDD PROTOCOL ━━
 Per task: RED (failing test) → GREEN (minimal impl) → REFACTOR → commit → mark [x]
+Use BRAINSTORM DESIGN DOC and GSTACK DECISIONS as implementation guide during RED phase.
+
+━━ AMBIGUITY HANDLING ━━
+Design questions were resolved by the brainstorming gate before this execution started.
+If BRAINSTORM_DOC + DECISIONS together answer the question → decide and proceed.
+Only block if a scenario is genuinely uncovered by both documents:
+  - Collect ALL remaining questions into: $(dirname "$GSD_PLAN_FILE")/OPEN_QUESTIONS.md
+  - Format: Q: <question> | Options: A)... B)... C)...
+  - Output: <promise>PHASE_BLOCKED:QUESTIONS</promise>
+  - Stop — do not guess.
 
 ━━ COMPLETION SIGNALS ━━
 All tasks [x] and tests pass: <promise>PHASE_COMPLETE</promise>
