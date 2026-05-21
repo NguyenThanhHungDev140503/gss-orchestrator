@@ -120,19 +120,20 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING
 
 ## PHASE 1 — PLANNING
 
-**Trigger:** `loop_state` is `IDLE`
+**Trigger:** `loop_state` is `PLANNING`
 
-GSD owns the full planning flow: interview → parallel research agents → roadmap → user approval → PLAN.md draft for first milestone.
-The orchestrator does NOT inject research — GSD dispatches its own research agents internally.
+GSD owns the planning flow: interview → roadmap → user approval → PLAN.md draft for first milestone.
+Pre-planning research has already produced `.planning/RESEARCH.md` in Phase 0 — GSD MUST
+consume that file as research context and SKIP its own internal research dispatch. This
+avoids the subagent depth-2 limit that would otherwise block GSD's research agents.
 
-### Step 1.1 — Save requirements
+### Step 1.1 — Verify Phase 0 outputs
 
 ```bash
-mkdir -p .planning
-cat > .planning/REQUIREMENTS.md << 'REQEOF'
-[paste user's full requirements / SRS here]
-REQEOF
+ls -la .planning/REQUIREMENTS.md .planning/RESEARCH.md
 ```
+
+Both files must exist. If either is missing, return to PHASE 0 — do not dispatch GSD without research.
 
 ### Step 1.2 — Dispatch gss-gsd-runner (mode: PLANNING)
 
@@ -143,10 +144,12 @@ Agent(
   subagent_type: "gss-gsd-runner",
   prompt: "Mode: PLANNING
 
-           Requirements (from .planning/REQUIREMENTS.md):
-           [paste requirements]
+           Requirements: .planning/REQUIREMENTS.md
+           Research context: .planning/RESEARCH.md  (already produced in Phase 0)
 
-           Run the full GSD planning workflow including research dispatch.
+           Run the GSD planning workflow using the supplied research.
+           SKIP GSD's internal research dispatch — RESEARCH.md is on disk
+           and will be passed as research context to GSD's planning skill.
            Invoke the appropriate GSD skill via the Skill tool, follow it
            to completion — including any AskUserQuestion gates (answer from
            requirements when possible) — and return PLANNING_COMPLETE JSON

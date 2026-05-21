@@ -140,29 +140,32 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING
 
 ## PHASE 1 — PLANNING
 
-**Trigger:** `loop_state` is `IDLE`
+**Trigger:** `loop_state` is `PLANNING`
 
-GSD handles the full planning flow internally — interview, research agents, roadmap, PLAN.md draft.
-The orchestrator does NOT inject research.
+GSD handles interview, roadmap, and PLAN.md draft.
+Pre-planning research has already produced `.planning/RESEARCH.md` in Phase 0 —
+GSD MUST consume that file as research context and SKIP its own internal research
+dispatch.
 
-Save requirements:
+Verify Phase 0 outputs exist:
 ```bash
-mkdir -p .planning
-cat > .planning/REQUIREMENTS.md << 'EOF'
-[paste user's requirements here]
-EOF
+ls -la .planning/REQUIREMENTS.md .planning/RESEARCH.md
 ```
+
+Both files must exist. If either is missing, return to PHASE 0 — do not dispatch GSD without research.
 
 Spawn one planning subagent. Its **initial message must begin with**:
 ```text
 $gsd-new-project --auto
 Initialize planning artifacts for this project.
 
-Requirements:
-[user requirements]
+Requirements: .planning/REQUIREMENTS.md
+Research context: .planning/RESEARCH.md  (already produced in Phase 0)
 
-Run the full GSD workflow including research dispatch and roadmap creation.
-Answer any AskUserQuestion gates using the requirements above when possible.
+Run the GSD workflow using the supplied research.
+SKIP GSD's internal research dispatch — RESEARCH.md is on disk and is the
+authoritative research context for this milestone.
+Answer any AskUserQuestion gates using the requirements when possible.
 When finished, output only:
 PLANNING_DONE: [current milestone name]
 ```
