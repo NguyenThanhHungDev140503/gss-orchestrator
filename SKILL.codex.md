@@ -433,6 +433,12 @@ Completed milestones so far: [list from GSS_STATE.json]
 Roadmap:
 [paste ROADMAP.md]
 
+After GSD completion/progress finishes, run the deterministic sync script for
+completed milestone before returning NEXT_PHASE or DELIVERED:
+```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "[milestone name]"
+```
+
 Return only one of:
 NEXT_PHASE: [milestone-id]
 DELIVERED
@@ -440,6 +446,7 @@ DELIVERED
 
 **If `NEXT_PHASE: <id>`:**
 ```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_shared_context.sh
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<id>"
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
@@ -448,6 +455,7 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
 
 **If `DELIVERED`:**
 ```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "DELIVERED"
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
 ```

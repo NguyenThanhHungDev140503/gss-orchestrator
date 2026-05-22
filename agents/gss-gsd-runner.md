@@ -63,19 +63,32 @@ Steps:
 
 ### Mode: DISPATCH
 
-Trigger: phase complete, orchestrator needs next phase or DELIVERED signal.
+Trigger: phase passed QA. First mark the current phase complete in GSD state,
+then plan the next phase or return DELIVERED.
 
 Steps:
-1. Read current state:
+1. Read current state and identify the completed phase:
    ```bash
    cat .planning/STATE.md
    cat .planning/ROADMAP.md
+   cat .planning/GSS_STATE.json 2>/dev/null || true
    ```
-2. Determine the next phase: scan ROADMAP.md for the next unplanned phase
+2. Mark the current phase done before looking for the next phase. Prefer the
+   GSD completion skill; then run the deterministic sync script so GSS state
+   records the completed milestone too:
+   ```bash
+   # Prefer Skill("gsd-complete-phase") or equivalent from installed GSD plugin.
+   # After the skill completes, or if it is unavailable, sync local state:
+   bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh \
+     "<current_phase_from_STATE>"
+   ```
+3. Re-read `.planning/STATE.md`, `.planning/phases/<phase>/STATE.md`, and
+   `.planning/GSS_STATE.json` to verify the completed phase is recorded.
+4. Determine the next phase: scan ROADMAP.md for the next unplanned phase
    after the completed one. If all phases are done, set `delivered: true`.
-3. If a next phase exists, invoke `gsd-plan-phase` with that phase number
+5. If a next phase exists, invoke `gsd-plan-phase` with that phase number
    via the Skill tool. Wait for it to fully complete.
-4. Re-read STATE.md to confirm next phase is now active.
+6. Re-read STATE.md to confirm next phase is now active.
 
 ### Mode: COMPLETE
 
@@ -124,7 +137,9 @@ Return ONLY one of these — no prose, no skill output, no markdown narration:
 {
   "mode": "DISPATCH",
   "status": "NEXT_PHASE",
+  "completed_phase": "01-auth",
   "current_phase": "02-api",
+  "milestones_done": ["01-auth"],
   "plan_path": ".planning/phases/02-api/PLAN.md"
 }
 ```
@@ -134,7 +149,9 @@ Return ONLY one of these — no prose, no skill output, no markdown narration:
 {
   "mode": "DISPATCH",
   "status": "DELIVERED",
-  "phases_completed": ["01-auth", "02-api", "03-ui"]
+  "completed_phase": "03-ui",
+  "phases_completed": ["01-auth", "02-api", "03-ui"],
+  "milestones_done": ["01-auth", "02-api", "03-ui"]
 }
 ```
 

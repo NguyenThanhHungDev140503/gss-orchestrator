@@ -457,6 +457,7 @@ Agent(
 
 **If `NEXT_PHASE: <id>`:**
 ```bash
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_shared_context.sh
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<next-milestone-id>"
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
@@ -465,6 +466,7 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
 
 **If `DELIVERED`:**
 ```bash
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "DELIVERED"
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
 ```
