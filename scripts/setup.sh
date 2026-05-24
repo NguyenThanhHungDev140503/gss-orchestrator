@@ -242,12 +242,21 @@ else
   echo -e "  ${YELLOW}↺${NC} .planning/shared_context.md exists — skipped"
 fi
 
-# ── 5. Sync agent files ───────────────────────────────────────────────────
+# ── 5. Browser automation dependencies ────────────────────────────────────
+echo ""
+echo "Setting up browser automation..."
+if [ -f "$SKILL_DIR/scripts/install_browser_automation_deps.sh" ]; then
+  bash "$SKILL_DIR/scripts/install_browser_automation_deps.sh"
+else
+  echo -e "  ${YELLOW}⚠${NC} install_browser_automation_deps.sh not found — skipped"
+fi
+
+# ── 6. Sync agent files ───────────────────────────────────────────────────
 echo ""
 echo "Syncing subagent files to .claude/agents/ ..."
 sync_agents
 
-# ── 6. Summary ────────────────────────────────────────────────────────────
+# ── 7. Summary ────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}=== Setup complete ===${NC}"
 echo ""

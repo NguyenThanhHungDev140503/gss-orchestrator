@@ -1,0 +1,18 @@
+import { expect, test } from "@playwright/test";
+import { createStagehand } from "../../stagehand.config";
+
+test("Stagehand custom provider scaffold is wired", async () => {
+  test.skip(!process.env.STAGEHAND_MODEL_NAME, "Set STAGEHAND_MODEL_NAME before running this sample.");
+
+  const stagehand = createStagehand();
+
+  await stagehand.init();
+  try {
+    const page = stagehand.context.pages()[0];
+    await page.goto("https://example.com");
+    const result = await stagehand.observe("find the main heading");
+    expect(Array.isArray(result)).toBe(true);
+  } finally {
+    await stagehand.close();
+  }
+});

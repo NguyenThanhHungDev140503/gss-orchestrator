@@ -254,7 +254,8 @@ Installer sẽ:
 # 1. Mở Claude Code trong project
 cd /your/project && claude
 
-# 2. Chạy setup (tạo .planning/, kiểm tra plugins, cài hooks)
+# 2. Chạy setup (tạo .planning/, kiểm tra plugins, cài hooks,
+#    cài Playwright + Stagehand và scaffold custom provider)
 bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/setup.sh
 
 # 3. Trigger orchestrator trong Claude session:
@@ -282,8 +283,9 @@ gsd-gstack-sp-orchestrator/
 │   ├── gss-reviewer.md         #   Phase 2, 3b — GStack wrapper
 │   ├── gss-executor.md         #   Phase 3 — Superpowers TDD
 │   └── gss-qa.md               #   Phase 4 — test runner
-├── scripts/                    # 14 deterministic helpers
-│   ├── setup.sh                #   Bootstrap dependencies + .planning/
+├── scripts/                    # 15 deterministic helpers
+│   ├── setup.sh                #   Bootstrap deps + .planning/ + browser automation
+│   ├── install_browser_automation_deps.sh
 │   ├── run_phase.sh            #   Fallback executor (no Task tool)
 │   ├── route_question.sh       #   Keyword router cho blocked Qs
 │   ├── update_state.sh         #   Cập nhật GSS_STATE.json
@@ -301,6 +303,9 @@ gsd-gstack-sp-orchestrator/
 │   ├── CLAUDE.md.template      #   GSS authority block
 │   ├── decisions-template.md
 │   ├── exec-prompt-template.md
+│   ├── env.stagehand.example.template
+│   ├── stagehand.config.ts.template
+│   ├── stagehand.example.spec.ts.template
 │   └── plugin-commands.md
 └── tests/
 ```

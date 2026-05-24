@@ -1,0 +1,25 @@
+import { Stagehand } from "@browserbasehq/stagehand";
+
+const stagehandEnv = process.env.STAGEHAND_ENV === "BROWSERBASE" ? "BROWSERBASE" : "LOCAL";
+
+export function createStagehand() {
+  const model = {
+    modelName: process.env.STAGEHAND_MODEL_NAME ?? "openai/gpt-4o-mini",
+    apiKey: process.env.STAGEHAND_API_KEY,
+    baseURL: process.env.STAGEHAND_BASE_URL,
+  };
+
+  if (stagehandEnv === "BROWSERBASE") {
+    return new Stagehand({
+      env: "BROWSERBASE",
+      apiKey: process.env.BROWSERBASE_API_KEY,
+      projectId: process.env.BROWSERBASE_PROJECT_ID,
+      model,
+    });
+  }
+
+  return new Stagehand({
+    env: "LOCAL",
+    model,
+  });
+}
