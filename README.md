@@ -77,7 +77,8 @@ Trạng thái lưu tại `.planning/GSS_STATE.json` và được đọc đầu m
 ```text
 IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
                                         ↕
-                                  GSTACK_QA (blocking Qs từ Superpowers)
+                                  GStack routing cho blocking Qs
+                                  rồi quay lại SP_EXECUTING
 ```
 
 | State | Trigger | Subagent dispatch |

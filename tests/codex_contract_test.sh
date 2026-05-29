@@ -97,4 +97,12 @@ assert_contains "$PROMPT_FILE" '$verification-before-completion'
 assert_contains "$PROMPT_FILE" 'Max iterations: 7.'
 assert_not_contains "$PROMPT_FILE" 'invoke skill superpowers'
 
+RUN_PHASE="$ROOT/scripts/run_phase.sh"
+assert_contains "$RUN_PHASE" 'bash "$SCRIPT_DIR/update_state.sh" "GSTACK_QA"'
+blocked_branch=$(sed -n '/"BLOCKED"|"BLOCKED_TECH")/,/exit 1 ;;/p' "$RUN_PHASE")
+if printf '%s\n' "$blocked_branch" | grep -Fq 'update_state.sh" "GSTACK_QA"'; then
+  echo "Blocked execution must not transition to GSTACK_QA" >&2
+  exit 1
+fi
+
 echo "codex contract ok"

@@ -126,7 +126,7 @@ case "$RESULT" in
     Q=$(cat "$GSD_BLOCKED_FILE" 2>/dev/null)
     TYPE=$(cat "$GSD_BLOCKED_TYPE_FILE" 2>/dev/null)
     echo '{"status":"BLOCKED"}' > "$RESULT_FILE"
-    bash "$SCRIPT_DIR/update_state.sh" "GSTACK_QA"
+    bash "$SCRIPT_DIR/update_state.sh" "SP_EXECUTING"
     echo -e "${YELLOW}⏸ BLOCKED [$TYPE]: $Q${NC}"
     echo "Next: invoke GStack skill with question, then inject_answer.sh, then retry"
     exit 1 ;;
