@@ -111,6 +111,13 @@ assert_contains "$tmpdir/.planning/bases/phases.base" 'type == "plan"'
 assert_contains "$tmpdir/.planning/bases/research.base" 'type == "research"'
 assert_contains "$tmpdir/.planning/bases/decisions.base" 'type == "decision-log"'
 
+assert_contains "$ROOT/scripts/setup.sh" "obsidian_meta.sh"
+assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_PROJECT_SLUG"
+assert_contains "$ROOT/scripts/log_decision.sh" "ensure-frontmatter"
+assert_contains "$ROOT/scripts/inject_answer.sh" "ensure-frontmatter"
+assert_contains "$ROOT/scripts/summarize_gstack.sh" "ensure-frontmatter"
+assert_contains "$ROOT/scripts/checkpoint.sh" "ensure-frontmatter"
+
 long_frontmatter="$tmpdir/.planning/LONG_FRONTMATTER.md"
 {
   echo "---"

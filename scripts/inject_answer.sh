@@ -11,6 +11,7 @@ ANSWER="${1:-}"
 
 EXEC_PROMPT="$GSD_EXEC_PROMPT"
 DECISIONS_FILE="$GSD_DECISIONS_FILE"
+OBSIDIAN_META="$SCRIPT_DIR/obsidian_meta.sh"
 
 [ ! -f "$EXEC_PROMPT" ] && \
   echo "ERROR: EXEC_PROMPT.md not found. Run write_exec_prompt.sh first." && exit 1
@@ -28,6 +29,12 @@ Resume executing next unchecked [ ] task with this decision.
 INJECT
 
 # Đồng thời log vào DECISIONS.md
+mkdir -p "$(dirname "$DECISIONS_FILE")"
+touch "$DECISIONS_FILE"
+if [ -x "$OBSIDIAN_META" ]; then
+  bash "$OBSIDIAN_META" ensure-frontmatter "$DECISIONS_FILE" decision-log "${GSD_CURRENT_PHASE:-}"
+fi
+
 {
   echo ""
   echo "---"

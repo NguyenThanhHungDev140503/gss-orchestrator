@@ -11,6 +11,7 @@ set -e
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+OBSIDIAN_META="$SKILL_DIR/scripts/obsidian_meta.sh"
 
 sync_agents() {
   local src="$SKILL_DIR/agents"
@@ -197,6 +198,13 @@ EOF
   echo -e "  ${GREEN}✓${NC} .planning/config.json"
 else
   echo -e "  ${YELLOW}↺${NC} .planning/config.json exists — skipped"
+fi
+
+if [ -x "$OBSIDIAN_META" ]; then
+  bash "$OBSIDIAN_META" init-project "$(basename "$PWD")" >/dev/null
+  bash "$OBSIDIAN_META" normalize-known >/dev/null
+  bash "$OBSIDIAN_META" write-bases >/dev/null
+  echo -e "  ${GREEN}✓${NC} Obsidian metadata initialized"
 fi
 
 # GSS_STATE.json
