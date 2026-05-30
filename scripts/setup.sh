@@ -200,11 +200,11 @@ else
   echo -e "  ${YELLOW}↺${NC} .planning/config.json exists — skipped"
 fi
 
+# Initialize project slug (no-clobber) before template files are created so they
+# pick up the correct slug. Frontmatter + bases are written after, below.
 if [ -x "$OBSIDIAN_META" ]; then
   bash "$OBSIDIAN_META" init-project "$(basename "$PWD")" >/dev/null
-  bash "$OBSIDIAN_META" normalize-known >/dev/null
-  bash "$OBSIDIAN_META" write-bases >/dev/null
-  echo -e "  ${GREEN}✓${NC} Obsidian metadata initialized"
+  echo -e "  ${GREEN}✓${NC} Obsidian project slug"
 fi
 
 # GSS_STATE.json
@@ -248,6 +248,14 @@ EOF
   echo -e "  ${GREEN}✓${NC} .planning/shared_context.md"
 else
   echo -e "  ${YELLOW}↺${NC} .planning/shared_context.md exists — skipped"
+fi
+
+# Normalize Obsidian frontmatter on all known artifacts (incl. the freshly
+# copied DECISIONS.md template) and regenerate Bases query files.
+if [ -x "$OBSIDIAN_META" ]; then
+  bash "$OBSIDIAN_META" normalize-known >/dev/null
+  bash "$OBSIDIAN_META" write-bases >/dev/null
+  echo -e "  ${GREEN}✓${NC} Obsidian metadata normalized"
 fi
 
 # ── 5. Browser automation dependencies ────────────────────────────────────

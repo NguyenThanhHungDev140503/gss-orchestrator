@@ -14,10 +14,14 @@ resolve_project_slug() {
     return
   fi
 
-  basename "$PWD" \
+  local slug
+  slug="$(basename "$PWD" \
     | tr '[:upper:]' '[:lower:]' \
     | tr ' _' '--' \
-    | sed 's/[^a-z0-9-]//g; s/--*/-/g; s/^-//; s/-$//'
+    | sed 's/[^a-z0-9-]//g; s/--*/-/g; s/^-//; s/-$//')"
+  # Match obsidian_meta.sh fallback for empty/odd directory names.
+  [ -z "$slug" ] && slug="project"
+  printf '%s\n' "$slug"
 }
 
 # ── Tìm active phase từ STATE.md ──────────────────────────────────────────

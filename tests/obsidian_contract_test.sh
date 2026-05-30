@@ -166,4 +166,69 @@ assert_contains "$ROOT/README.md" ".planning/.project_slug"
 assert_contains "$ROOT/README.md" ".planning/bases/"
 assert_contains "$ROOT/README.md" ".planning/RESEARCH.md"
 
+# ── Idempotency / preservation regressions ───────────────────────────────────
+idem="$(mktemp -d)"
+trap 'rm -rf "$tmpdir" "$idem"' EXIT
+mkdir -p "$idem/.planning/phases/01-demo"
+
+(
+  cd "$idem"
+  bash "$SCRIPT" init-project "My Real Product" >/dev/null
+)
+
+# init-project must NOT clobber an existing slug
+(
+  cd "$idem"
+  bash "$SCRIPT" init-project "Some Other Name" >/dev/null
+)
+if [ "$(cat "$idem/.planning/.project_slug")" != "my-real-product" ]; then
+  echo "init-project overwrote an existing slug" >&2
+  exit 1
+fi
+
+# ensure-frontmatter must preserve created and unmanaged fields on re-normalize
+cat > "$idem/.planning/ROADMAP.md" <<'EOF'
+---
+title: "Old Title"
+type: roadmap
+project_slug: my-real-product
+created: 2020-01-01
+updated: 2020-01-01
+status: final
+phase_count: 7
+---
+# Roadmap
+Body stays.
+EOF
+
+(
+  cd "$idem"
+  bash "$SCRIPT" ensure-frontmatter ".planning/ROADMAP.md" roadmap >/dev/null
+)
+assert_contains "$idem/.planning/ROADMAP.md" "created: 2020-01-01"
+assert_contains "$idem/.planning/ROADMAP.md" "status: final"
+assert_contains "$idem/.planning/ROADMAP.md" "phase_count: 7"
+assert_contains "$idem/.planning/ROADMAP.md" "Body stays."
+if [ "$(grep -c '^updated:' "$idem/.planning/ROADMAP.md")" != "1" ]; then
+  echo "ROADMAP.md should have exactly one updated field" >&2
+  exit 1
+fi
+
+# a read-style ensure-frontmatter on a missing-slug repo must not create a slug
+noslug="$(mktemp -d)"
+mkdir -p "$noslug/.planning"
+cat > "$noslug/.planning/DECISIONS.md" <<'EOF'
+# Decisions
+EOF
+(
+  cd "$noslug"
+  bash "$SCRIPT" ensure-frontmatter ".planning/DECISIONS.md" decision-log >/dev/null
+)
+if [ -f "$noslug/.planning/.project_slug" ] && [ -s "$noslug/.planning/.project_slug" ]; then
+  echo "ensure-frontmatter must not persist a .project_slug file" >&2
+  rm -rf "$noslug"
+  exit 1
+fi
+rm -rf "$noslug"
+
 echo "obsidian contract ok"

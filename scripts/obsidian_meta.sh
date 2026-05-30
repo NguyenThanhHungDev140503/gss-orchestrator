@@ -34,14 +34,27 @@ write_slug() {
 }
 
 project_slug() {
-  mkdir -p "$PLANNING_DIR"
-
   if [ -s "$SLUG_FILE" ]; then
     cat "$SLUG_FILE"
     return 0
   fi
 
-  write_slug "$(basename "$PWD")"
+  # Read-only resolution: compute from cwd without persisting a slug file.
+  local slug
+  slug="$(slugify "$(basename "$PWD")")"
+  [ -z "$slug" ] && slug="project"
+  printf '%s\n' "$slug"
+}
+
+# init-project is no-clobber: an existing non-empty slug is authoritative so the
+# every-turn bootstrap cannot overwrite a slug chosen in Phase 0.
+init_project() {
+  mkdir -p "$PLANNING_DIR"
+  if [ -s "$SLUG_FILE" ]; then
+    cat "$SLUG_FILE"
+    return 0
+  fi
+  write_slug "${1:-}"
 }
 
 has_frontmatter() {
@@ -74,7 +87,9 @@ frontmatter_for() {
   local type="$2"
   local phase="${3:-}"
   local slug="$4"
-  local date="$5"
+  local created="$5"
+  local updated="$6"
+  local extras="${7:-}"
   local title
   title="$(basename "$file" .md)"
 
@@ -87,8 +102,8 @@ tags:
   - gsd
   - $type
   - project/$slug
-created: $date
-updated: $date
+created: $created
+updated: $updated
 EOF
 
   if [ "$type" = "research" ]; then
@@ -126,6 +141,10 @@ EOF
       ;;
   esac
 
+  if [ -n "$extras" ] && [ -s "$extras" ]; then
+    cat "$extras"
+  fi
+
   echo "---"
 }
 
@@ -141,27 +160,55 @@ ensure_frontmatter() {
 
   [ -f "$file" ] || return 0
 
-  local slug date tmp
+  local slug today_date created updated tmp extras
   slug="$(project_slug)"
-  date="$(today)"
+  today_date="$(today)"
   tmp="$(mktemp)"
+  extras="$(mktemp)"
 
   if has_frontmatter "$file"; then
     local end_line
     end_line="$(frontmatter_end_line "$file")"
-    frontmatter_for "$file" "$type" "$phase" "$slug" "$date" > "$tmp"
+
+    # Preserve the original created date when present.
+    created="$(sed -n "2,${end_line}p" "$file" | sed -n 's/^created:[[:space:]]*//p' | head -1)"
+    [ -z "$created" ] && created="$today_date"
+
+    # Preserve unmanaged frontmatter so re-normalize is non-destructive.
+    # Drop helper-managed keys and the list items they own (tags/related).
+    sed -n "2,$((end_line - 1))p" "$file" | awk '
+      BEGIN { skipping = 0 }
+      /^[A-Za-z0-9_]+:/ {
+        key = $0
+        sub(/:.*/, "", key)
+        managed = (key == "title" || key == "type" || key == "project_slug"           || key == "tags" || key == "created" || key == "updated"           || key == "research_dimension" || key == "phase" || key == "project"           || key == "plan" || key == "decisions" || key == "related")
+        if (managed) { skipping = 1; next }
+        skipping = 0
+        print
+        next
+      }
+      /^[[:space:]]*-/ { if (skipping) next; print; next }
+      /^[[:space:]]/ { if (skipping) next; print; next }
+      { skipping = 0; print }
+    ' > "$extras"
+
+    updated="$today_date"
+    frontmatter_for "$file" "$type" "$phase" "$slug" "$created" "$updated" "$extras" > "$tmp"
     printf '\n' >> "$tmp"
     tail -n +"$((end_line + 1))" "$file" >> "$tmp"
   elif [ "$(sed -n '1p' "$file")" = "---" ]; then
     echo "WARN: malformed frontmatter in $file; left unchanged" >&2
-    rm -f "$tmp"
+    rm -f "$tmp" "$extras"
     return 0
   else
-    frontmatter_for "$file" "$type" "$phase" "$slug" "$date" > "$tmp"
+    created="$today_date"
+    updated="$today_date"
+    frontmatter_for "$file" "$type" "$phase" "$slug" "$created" "$updated" "" > "$tmp"
     printf '\n' >> "$tmp"
     cat "$file" >> "$tmp"
   fi
 
+  rm -f "$extras"
   mv "$tmp" "$file"
 }
 
@@ -270,7 +317,7 @@ EOF
 cmd="${1:-}"
 case "$cmd" in
   init-project)
-    write_slug "${2:-}"
+    init_project "${2:-}"
     ;;
   ensure-frontmatter)
     ensure_frontmatter "${2:-}" "${3:-}" "${4:-}"
