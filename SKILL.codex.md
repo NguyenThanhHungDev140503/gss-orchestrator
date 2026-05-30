@@ -489,6 +489,7 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --phase
 | File | Written by | Read by |
 |------|-----------|---------|
 | `REQUIREMENTS.md` | Orchestrator | Planning subagent (GSD) |
+| `RESEARCH.md` | Researcher subagent | Planning subagent (GSD) |
 | `ROADMAP.md` | Planning subagent (GSD) | Orchestrator, review subagents |
 | `PLAN.md` (draft) | Planning subagent (GSD) | Brainstorming gate subagent |
 | `DECISIONS.md` | Review subagents (GStack) | Brainstorming gate, executor |
@@ -506,3 +507,69 @@ cat .planning/STATE.md
 ```
 
 Resume from `loop_state` shown. Orchestrator identity resumes immediately.
+
+---
+
+## OBSIDIAN DOCUMENT STANDARD
+
+All `.planning/` documents carry Obsidian YAML frontmatter so they can be queried
+via `.planning/bases/*.base` in any Obsidian vault. Frontmatter is written and
+maintained by `scripts/obsidian_meta.sh` — the orchestrator and subagents should
+not hand-write it.
+
+This orchestrator runs in **compatible mode**: research lives in the single file
+`.planning/RESEARCH.md` (frontmatter `type: research`, `research_dimension:
+summary`). Research is not split into per-dimension files under a research/
+subfolder.
+
+### Project Slug
+
+Derived once in Phase 0 and stored in `.planning/.project_slug`. Format:
+lowercase, hyphenated, alphanumeric only.
+
+```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh init-project "<project name>"
+cat .planning/.project_slug
+```
+
+`init-project` is no-clobber: once a slug exists it is authoritative, so the
+every-turn bootstrap does not overwrite a slug chosen in Phase 0.
+
+### Normalizing Frontmatter
+
+After any subagent writes or updates a known artifact, normalize metadata:
+
+```bash
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known
+```
+
+`normalize-known` manages frontmatter for these document types:
+
+| File | type |
+|------|------|
+| `REQUIREMENTS.md` | `requirements` |
+| `RESEARCH.md` | `research` (`research_dimension: summary`) |
+| `PROJECT.md` | `project` |
+| `ROADMAP.md` | `roadmap` |
+| `DECISIONS.md` | `decision-log` |
+| `shared_context.md` | `shared-context` |
+| `CHECKPOINT_HISTORY.md` | `checkpoint-log` |
+| `phases/<phase>/PLAN.md` | `plan` |
+| `phases/<phase>/DECISIONS.md` | `decision-log` |
+| `phases/<phase>/BRAINSTORM_DOC.md` | `brainstorm` |
+| `phases/<phase>/EXEC_PROMPT.md` | `execution-prompt` |
+
+The helper preserves existing body content and unmanaged frontmatter fields,
+keeps the original `created` date, refreshes `updated`, and adds `project`,
+`phase`, and wikilink fields where applicable.
+
+### Bases Files
+
+Generated into `.planning/bases/` by `scripts/obsidian_meta.sh write-bases`:
+
+| File | Queries |
+|------|---------|
+| `project-dashboard.base` | All documents grouped by type |
+| `phases.base` | All PLAN.md files with status |
+| `research.base` | Research docs by dimension |
+| `decisions.base` | Decision logs grouped by phase |
