@@ -144,4 +144,26 @@ assert_contains "$ROOT/agents/gss-gsd-runner.md" "normalize-known"
 assert_contains "$ROOT/agents/gss-reviewer.md" "ensure-frontmatter"
 assert_contains "$ROOT/agents/gss-brainstormer.md" "normalize-known"
 
+assert_not_contains() {
+  local file="$1"
+  local pattern="$2"
+  if grep -Fq -- "$pattern" "$file"; then
+    echo "Expected '$file' to not contain: $pattern" >&2
+    exit 1
+  fi
+}
+
+assert_contains "$ROOT/SKILL.md" "scripts/obsidian_meta.sh"
+assert_contains "$ROOT/SKILL.md" ".planning/RESEARCH.md"
+assert_not_contains "$ROOT/SKILL.md" "gss-research-synthesizer"
+assert_not_contains "$ROOT/SKILL.md" "gss-roadmapper"
+assert_not_contains "$ROOT/SKILL.md" "research/STACK.md"
+assert_not_contains "$ROOT/SKILL.md" "research/FEATURES.md"
+assert_not_contains "$ROOT/SKILL.md" "research/ARCHITECTURE.md"
+assert_not_contains "$ROOT/SKILL.md" "research/PITFALLS.md"
+assert_contains "$ROOT/SKILL.codex.md" "obsidian_meta.sh"
+assert_contains "$ROOT/README.md" ".planning/.project_slug"
+assert_contains "$ROOT/README.md" ".planning/bases/"
+assert_contains "$ROOT/README.md" ".planning/RESEARCH.md"
+
 echo "obsidian contract ok"

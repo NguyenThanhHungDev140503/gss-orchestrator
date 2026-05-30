@@ -100,12 +100,14 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUT
 Pre-planning web research feeds GSD with a compact `RESEARCH.md` so it does not
 need to dispatch nested research agents.
 
-Save requirements:
+Save requirements and initialize Obsidian metadata:
 ```bash
 mkdir -p .planning
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh init-project "<project-name>"
 cat > .planning/REQUIREMENTS.md << 'EOF'
 [paste user's requirements here]
 EOF
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known
 ```
 
 Spawn one researcher subagent. Its **initial message must begin with**:
@@ -173,8 +175,14 @@ PLANNING_DONE: [current milestone name]
 After subagent outputs `PLANNING_DONE`:
 ```bash
 cat .planning/STATE.md
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known
+bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh write-bases
 bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>"
 ```
+
+Research stays in the single file `.planning/RESEARCH.md` (compatible mode); it
+is not split into per-dimension files. Frontmatter and `.planning/bases/*.base`
+are managed by `scripts/obsidian_meta.sh`.
 
 ---
 
