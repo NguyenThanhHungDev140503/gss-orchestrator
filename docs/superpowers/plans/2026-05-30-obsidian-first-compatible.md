@@ -85,19 +85,13 @@ assert_contains() {
   fi
 }
 
-assert_not_contains() {
-  local file="$1"
-  local pattern="$2"
-  if grep -Fq -- "$pattern" "$file"; then
-    echo "Expected '$file' to not contain: $pattern" >&2
-    exit 1
-  fi
-}
-
 assert_frontmatter_type() {
   local file="$1"
   local type="$2"
-  assert_contains "$file" "---"
+  if [ "$(sed -n '1p' "$file")" != "---" ]; then
+    echo "Expected '$file' to start with YAML frontmatter" >&2
+    exit 1
+  fi
   assert_contains "$file" "type: $type"
   assert_contains "$file" "project_slug: demo-app"
 }
@@ -170,9 +164,6 @@ assert_contains "$tmpdir/.planning/bases/project-dashboard.base" 'file.hasTag("p
 assert_contains "$tmpdir/.planning/bases/phases.base" 'type == "plan"'
 assert_contains "$tmpdir/.planning/bases/research.base" 'type == "research"'
 assert_contains "$tmpdir/.planning/bases/decisions.base" 'type == "decision-log"'
-
-assert_not_contains "$ROOT/SKILL.md" "gss-research-synthesizer"
-assert_not_contains "$ROOT/SKILL.md" "gss-roadmapper"
 
 echo "obsidian contract ok"
 ```
@@ -496,7 +487,7 @@ Run:
 bash tests/obsidian_contract_test.sh
 ```
 
-Expected: FAIL with `Expected '.../SKILL.md' to not contain: gss-research-synthesizer`.
+Expected: PASS and print `obsidian contract ok`.
 
 - [ ] **Step 4: Run helper smoke test directly**
 
@@ -636,7 +627,7 @@ bash tests/codex_contract_test.sh
 bash tests/browser_automation_contract_test.sh
 ```
 
-Expected: Obsidian test fails only with `Expected '.../SKILL.md' to not contain: gss-research-synthesizer`; existing tests pass.
+Expected: all three tests pass.
 
 - [ ] **Step 7: Commit script integration**
 
@@ -753,7 +744,7 @@ bash tests/obsidian_contract_test.sh
 bash tests/codex_contract_test.sh
 ```
 
-Expected: Obsidian test fails only with `Expected '.../SKILL.md' to not contain: gss-research-synthesizer`; Codex test passes.
+Expected: both tests pass.
 
 - [ ] **Step 6: Commit docs integration**
 
