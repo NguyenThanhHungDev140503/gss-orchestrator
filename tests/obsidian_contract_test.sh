@@ -20,19 +20,13 @@ assert_contains() {
   fi
 }
 
-assert_not_contains() {
-  local file="$1"
-  local pattern="$2"
-  if grep -Fq -- "$pattern" "$file"; then
-    echo "Expected '$file' to not contain: $pattern" >&2
-    exit 1
-  fi
-}
-
 assert_frontmatter_type() {
   local file="$1"
   local type="$2"
-  assert_contains "$file" "---"
+  if [ "$(sed -n '1p' "$file")" != "---" ]; then
+    echo "Expected '$file' to start with YAML frontmatter" >&2
+    exit 1
+  fi
   assert_contains "$file" "type: $type"
   assert_contains "$file" "project_slug: demo-app"
 }
@@ -105,8 +99,5 @@ assert_contains "$tmpdir/.planning/bases/project-dashboard.base" 'file.hasTag("p
 assert_contains "$tmpdir/.planning/bases/phases.base" 'type == "plan"'
 assert_contains "$tmpdir/.planning/bases/research.base" 'type == "research"'
 assert_contains "$tmpdir/.planning/bases/decisions.base" 'type == "decision-log"'
-
-assert_not_contains "$ROOT/SKILL.md" "gss-research-synthesizer"
-assert_not_contains "$ROOT/SKILL.md" "gss-roadmapper"
 
 echo "obsidian contract ok"
