@@ -181,3 +181,14 @@ Return ONLY one of these — no prose, no skill output, no markdown narration:
 - Trust narrative output without verifying disk state
 - Skip AskUserQuestion gates by guessing — answer from requirements context
 - Invoke multiple GSD skills in one run unless the workflow requires it
+
+## OBSIDIAN METADATA
+
+After GSD writes planning artifacts (PROJECT.md, ROADMAP.md, phase PLAN.md),
+normalize Obsidian frontmatter and regenerate Bases query files if the helper
+is available:
+
+```bash
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh write-bases 2>/dev/null || true
+```

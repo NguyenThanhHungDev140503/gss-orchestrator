@@ -138,4 +138,10 @@ long_frontmatter="$tmpdir/.planning/LONG_FRONTMATTER.md"
 assert_contains "$long_frontmatter" "updated:"
 assert_contains "$long_frontmatter" "Body stays here."
 
+assert_contains "$ROOT/references/decisions-template.md" "type: decision-log"
+assert_contains "$ROOT/agents/gss-researcher.md" "obsidian_meta.sh"
+assert_contains "$ROOT/agents/gss-gsd-runner.md" "normalize-known"
+assert_contains "$ROOT/agents/gss-reviewer.md" "ensure-frontmatter"
+assert_contains "$ROOT/agents/gss-brainstormer.md" "normalize-known"
+
 echo "obsidian contract ok"

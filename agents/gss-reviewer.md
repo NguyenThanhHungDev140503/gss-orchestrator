@@ -144,3 +144,13 @@ After receiving GStack output:
 - Include role preambles or process commentary in decisions
 - Return log file contents — only the path
 - Contradict decisions already in DECISIONS.md without flagging explicitly
+
+## OBSIDIAN METADATA
+
+Before appending decisions, ensure the decision file has Obsidian frontmatter
+(`log_decision.sh` and `summarize_gstack.sh` already do this; call directly if
+appending manually):
+
+```bash
+bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh ensure-frontmatter "$GSD_DECISIONS_FILE" decision-log "$GSD_CURRENT_PHASE" 2>/dev/null || true
+```
