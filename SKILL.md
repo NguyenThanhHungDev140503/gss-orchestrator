@@ -30,13 +30,28 @@ If you find yourself in Superpowers' flow without a Task boundary, stop. Return 
 
 ## BOOTSTRAP CHECK — RUN FIRST
 
-Before state machine logic, always run setup to guarantee prerequisites and hooks are up to date (project-local first, then global fallback):
+Before state machine logic, resolve where this skill is installed (project-local
+or global), cache the absolute path in `.planning/.gss_home`, then run setup.
+Every later command reads `$(cat .planning/.gss_home)/scripts/...`, so it works
+no matter where the skill was installed.
+
 ```bash
-if [ -f .claude/skills/gsd-gstack-sp-orchestrator/scripts/setup.sh ]; then
-  bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/setup.sh
+# >>> gss-resolve
+mkdir -p .planning
+SKILL_NAME="gsd-gstack-sp-orchestrator"
+for cand in ".claude/skills/$SKILL_NAME" "$HOME/.claude/skills/$SKILL_NAME"; do
+  if [ -f "$cand/scripts/setup.sh" ]; then
+    GSS_HOME="$(cd "$cand" && pwd)"
+    break
+  fi
+done
+if [ -z "${GSS_HOME:-}" ]; then
+  echo "ERROR: cannot locate $SKILL_NAME (looked in .claude and ~/.claude)" >&2
 else
-  bash ~/.claude/skills/gsd-gstack-sp-orchestrator/scripts/setup.sh
+  printf '%s\n' "$GSS_HOME" > .planning/.gss_home
+  bash "$GSS_HOME/scripts/setup.sh"
 fi
+# <<< gss-resolve
 ```
 
 If setup fails, STOP and ask user to fix setup errors before continuing.
@@ -76,7 +91,7 @@ unclear, the helper falls back to the working directory name.
 
 ```bash
 mkdir -p .planning
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh init-project "<project name>"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh init-project "<project name>"
 
 cat > .planning/REQUIREMENTS.md << 'REQEOF'
 [paste user's full requirements / SRS here]
@@ -87,7 +102,7 @@ Normalize Obsidian frontmatter on the new file — the helper adds the
 `requirements` frontmatter automatically:
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 ```
 
 ### Step 0.2 — Dispatch gss-researcher
@@ -125,7 +140,7 @@ If `.planning/RESEARCH.md` is missing or empty → re-dispatch, do not proceed.
 ### Step 0.4 — Update state
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "PLANNING"
 ```
 
 **→ Proceed to PHASE 1**
@@ -198,7 +213,7 @@ If `.planning/` was not created → re-invoke, do not proceed.
 ### Step 1.4 — Update state
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>"
 ```
 
 ### Step 1.5 — Generate Obsidian Bases query files
@@ -208,8 +223,8 @@ metadata helper writes `project-dashboard.base`, `phases.base`, `research.base`,
 and `decisions.base` into `.planning/bases/` using the stored project slug:
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh write-bases
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
 ```
 
 **→ Proceed to PHASE 2**
@@ -223,7 +238,7 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh write-ba
 ### Step 2.1 — Prepare plan content for review
 
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 cat "$GSD_PLAN_FILE" 2>/dev/null || cat .planning/ROADMAP.md
 ```
 
@@ -304,12 +319,12 @@ Agent(
 ### Step 2.4 — Advance to brainstorm gate
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "eng-review" "[extracted engineering decisions]"
 
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_BRAINSTORM"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_BRAINSTORM"
 
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 
 **→ Proceed to PHASE 3**
@@ -389,11 +404,11 @@ Agent(
 
 **If `DESIGN_CONFIRMED`:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt.sh
+bash $(cat .planning/.gss_home)/scripts/write_exec_prompt.sh
 
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 → Proceed to PHASE 4
 
@@ -422,10 +437,10 @@ Agent(
 
 After receiving decision:
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "brainstorm-gate" "[decision from reviewer]"
 
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decision]"
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh "[decision]"
 ```
 → Return to Step 3.1 (re-dispatch gss-brainstormer with updated DECISIONS.md)
 
@@ -441,7 +456,7 @@ This phase runs Superpowers TDD in **complete isolation** via Task tool.
 ### Step 4.1 — Build task prompt
 
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 EXEC_CONTENT=$(cat "$GSD_EXEC_PROMPT")
 ```
 
@@ -482,14 +497,14 @@ WORKFLOW (do not deviate):
 
 **If `PHASE_COMPLETE`:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_QA"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_QA"
 ```
 → Proceed to PHASE 5
 
 **If `PHASE_BLOCKED:QUESTIONS`:**
 ```bash
 cat .planning/phases/<phase>/OPEN_QUESTIONS.md
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/route_question.sh \
+bash $(cat .planning/.gss_home)/scripts/route_question.sh \
   "$(cat .planning/phases/<phase>/OPEN_QUESTIONS.md)"
 ```
 
@@ -498,7 +513,7 @@ Dispatch gss-reviewer to answer, inject answer, re-launch Task.
 
 **If no signal — check implicit done:**
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 grep -c "^\- \[ \]" "$GSD_PLAN_FILE" && echo "still pending" || echo "all done"
 ```
 If all done → treat as PHASE_COMPLETE → Proceed to PHASE 5
@@ -525,15 +540,15 @@ Agent(
 
 **If `STATUS: PASSED`:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSD_DISPATCH"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
 ```
 → Proceed to PHASE 6
 
 **If `STATUS: FAILED`:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh \
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
   "QA FAILED: [paste failures[] from gss-qa JSON]"
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 ```
 → Return to PHASE 4 (re-dispatch gss-executor with failure context)
 
@@ -563,18 +578,18 @@ Agent(
 
 **If `NEXT_PHASE: <id>`:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_shared_context.sh
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<next-milestone-id>"
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
+bash $(cat .planning/.gss_home)/scripts/mark_milestone_done.sh "<completed-milestone-id>"
+bash $(cat .planning/.gss_home)/scripts/update_shared_context.sh
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<next-milestone-id>"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh --milestone
 ```
 → Return to PHASE 2 with new milestone
 
 **If `DELIVERED`:**
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "DELIVERED"
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
+bash $(cat .planning/.gss_home)/scripts/mark_milestone_done.sh "<completed-milestone-id>"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "DELIVERED"
+bash $(cat .planning/.gss_home)/scripts/print_summary.sh
 ```
 
 ---
@@ -606,7 +621,7 @@ bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
 
 7. **Context hygiene after every subagent dispatch:**
    ```bash
-   bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+   bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
    ```
 
 ---
@@ -660,7 +675,7 @@ Derived once in Phase 0 and stored in `.planning/.project_slug`. Format:
 lowercase, hyphenated, alphanumeric only.
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh init-project "<project name>"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh init-project "<project name>"
 cat .planning/.project_slug
 ```
 
@@ -669,7 +684,7 @@ cat .planning/.project_slug
 After any agent writes or updates a known artifact, normalize metadata:
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 ```
 
 `normalize-known` manages frontmatter for these document types:

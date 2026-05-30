@@ -28,7 +28,7 @@ The orchestrator never sees GStack prose — only the extracted decisions in JSO
 ## BEFORE RUNNING REVIEW
 
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 mkdir -p "$GSD_LOG_DIR"
 ```
 
@@ -152,5 +152,5 @@ Before appending decisions, ensure the decision file has Obsidian frontmatter
 appending manually):
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh ensure-frontmatter "$GSD_DECISIONS_FILE" decision-log "$GSD_CURRENT_PHASE" 2>/dev/null || true
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh ensure-frontmatter "$GSD_DECISIONS_FILE" decision-log "$GSD_CURRENT_PHASE" 2>/dev/null || true
 ```

@@ -35,7 +35,7 @@ Skill("superpowers:brainstorming")
 
 Then resolve paths:
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 mkdir -p "$GSD_LOG_DIR"
 ```
 
@@ -177,5 +177,5 @@ After writing `BRAINSTORM_DOC.md` or refining `PLAN.md`, normalize Obsidian
 frontmatter if the helper is available:
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
 ```

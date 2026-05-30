@@ -111,5 +111,5 @@ After writing `.planning/RESEARCH.md` (which remains the research source of trut
 normalize Obsidian frontmatter if the helper is available:
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
 ```

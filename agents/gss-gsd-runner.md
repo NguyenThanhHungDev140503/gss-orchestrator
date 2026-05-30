@@ -79,7 +79,7 @@ Steps:
    ```bash
    # Prefer Skill("gsd-complete-phase") or equivalent from installed GSD plugin.
    # After the skill completes, or if it is unavailable, sync local state:
-   bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh \
+   bash $(cat .planning/.gss_home)/scripts/mark_milestone_done.sh \
      "<current_phase_from_STATE>"
    ```
 3. Re-read `.planning/STATE.md`, `.planning/phases/<phase>/STATE.md`, and
@@ -189,6 +189,6 @@ normalize Obsidian frontmatter and regenerate Bases query files if the helper
 is available:
 
 ```bash
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
-bash .claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh write-bases 2>/dev/null || true
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases 2>/dev/null || true
 ```

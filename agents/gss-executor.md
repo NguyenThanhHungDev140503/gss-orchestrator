@@ -34,7 +34,7 @@ Do NOT proceed until this skill is loaded. Follow its RED/GREEN/REFACTOR methodo
 
 ```bash
 # Find active PLAN.md (already refined by gss-brainstormer)
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 cat "$GSD_PLAN_FILE"
 
 # Read brainstorm design doc for implementation context
