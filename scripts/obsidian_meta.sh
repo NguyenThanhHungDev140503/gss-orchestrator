@@ -48,8 +48,25 @@ has_frontmatter() {
   local file="$1"
 
   [ -f "$file" ] || return 1
-  [ "$(sed -n '1p' "$file")" = "---" ] || return 1
-  sed -n '2,80p' "$file" | grep -qx -- "---"
+  frontmatter_end_line "$file" >/dev/null
+}
+
+frontmatter_end_line() {
+  local file="$1"
+
+  [ -f "$file" ] || return 1
+  awk '
+    NR == 1 && $0 != "---" { exit 1 }
+    NR == 1 { next }
+    $0 == "---" {
+      print NR
+      found = 1
+      exit
+    }
+    END {
+      if (!found) exit 1
+    }
+  ' "$file"
 }
 
 frontmatter_for() {
@@ -130,22 +147,11 @@ ensure_frontmatter() {
   tmp="$(mktemp)"
 
   if has_frontmatter "$file"; then
-    awk -v updated="$date" '
-      BEGIN { in_fm=0; done=0 }
-      NR==1 && $0=="---" { in_fm=1; print; next }
-      in_fm && $0=="---" {
-        if (!done) print "updated: " updated
-        in_fm=0
-        print
-        next
-      }
-      in_fm && $0 ~ /^updated:/ {
-        print "updated: " updated
-        done=1
-        next
-      }
-      { print }
-    ' "$file" > "$tmp"
+    local end_line
+    end_line="$(frontmatter_end_line "$file")"
+    frontmatter_for "$file" "$type" "$phase" "$slug" "$date" > "$tmp"
+    printf '\n' >> "$tmp"
+    tail -n +"$((end_line + 1))" "$file" >> "$tmp"
   elif [ "$(sed -n '1p' "$file")" = "---" ]; then
     echo "WARN: malformed frontmatter in $file; left unchanged" >&2
     rm -f "$tmp"

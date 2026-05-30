@@ -43,6 +43,16 @@ cat > "$tmpdir/.planning/REQUIREMENTS.md" <<'EOF'
 Build the demo app.
 EOF
 cat > "$tmpdir/.planning/RESEARCH.md" <<'EOF'
+---
+title: "Old Research"
+type: note
+project_slug: stale-project
+tags:
+  - old
+created: 2020-01-01
+updated: 2020-01-01
+research_dimension: detail
+---
 # Research Summary
 Use boring tech.
 EOF
@@ -83,6 +93,7 @@ fi
 assert_frontmatter_type "$tmpdir/.planning/REQUIREMENTS.md" "requirements"
 assert_frontmatter_type "$tmpdir/.planning/RESEARCH.md" "research"
 assert_contains "$tmpdir/.planning/RESEARCH.md" "research_dimension: summary"
+assert_contains "$tmpdir/.planning/RESEARCH.md" "Use boring tech."
 assert_frontmatter_type "$tmpdir/.planning/ROADMAP.md" "roadmap"
 assert_frontmatter_type "$tmpdir/.planning/DECISIONS.md" "decision-log"
 assert_frontmatter_type "$tmpdir/.planning/shared_context.md" "shared-context"
@@ -99,5 +110,25 @@ assert_contains "$tmpdir/.planning/bases/project-dashboard.base" 'file.hasTag("p
 assert_contains "$tmpdir/.planning/bases/phases.base" 'type == "plan"'
 assert_contains "$tmpdir/.planning/bases/research.base" 'type == "research"'
 assert_contains "$tmpdir/.planning/bases/decisions.base" 'type == "decision-log"'
+
+long_frontmatter="$tmpdir/.planning/LONG_FRONTMATTER.md"
+{
+  echo "---"
+  echo 'title: "Long Frontmatter"'
+  for i in $(seq 1 85); do
+    echo "field_$i: value_$i"
+  done
+  echo "---"
+  echo "# Long Frontmatter"
+  echo "Body stays here."
+} > "$long_frontmatter"
+
+(
+  cd "$tmpdir"
+  bash "$SCRIPT" ensure-frontmatter ".planning/LONG_FRONTMATTER.md" note >/dev/null
+)
+
+assert_contains "$long_frontmatter" "updated:"
+assert_contains "$long_frontmatter" "Body stays here."
 
 echo "obsidian contract ok"
