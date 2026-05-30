@@ -175,16 +175,37 @@ mkdir -p "$idem/.planning/phases/01-demo"
   cd "$idem"
   bash "$SCRIPT" init-project "My Real Product" >/dev/null
 )
-
-# init-project must NOT clobber an existing slug
-(
-  cd "$idem"
-  bash "$SCRIPT" init-project "Some Other Name" >/dev/null
-)
 if [ "$(cat "$idem/.planning/.project_slug")" != "my-real-product" ]; then
-  echo "init-project overwrote an existing slug" >&2
+  echo "init-project with a name did not set the slug" >&2
   exit 1
 fi
+
+# init-project WITHOUT a name is no-clobber: the every-turn bootstrap must not
+# overwrite a slug already chosen in Phase 0.
+(
+  cd "$idem"
+  bash "$SCRIPT" init-project >/dev/null
+)
+if [ "$(cat "$idem/.planning/.project_slug")" != "my-real-product" ]; then
+  echo "argument-less init-project overwrote an existing slug" >&2
+  exit 1
+fi
+
+# init-project WITH a name is an intentional set: it overrides a placeholder
+# slug that the bootstrap derived from the directory name.
+plc="$(mktemp -d)"
+mkdir -p "$plc/.planning"
+(
+  cd "$plc"
+  bash "$SCRIPT" init-project >/dev/null          # bootstrap-style: derive from dir
+  bash "$SCRIPT" init-project "Real Chosen Name" >/dev/null  # Phase 0: real name
+)
+if [ "$(cat "$plc/.planning/.project_slug")" != "real-chosen-name" ]; then
+  echo "named init-project did not override a derived slug" >&2
+  rm -rf "$plc"
+  exit 1
+fi
+rm -rf "$plc"
 
 # ensure-frontmatter must preserve created and unmanaged fields on re-normalize
 cat > "$idem/.planning/ROADMAP.md" <<'EOF'

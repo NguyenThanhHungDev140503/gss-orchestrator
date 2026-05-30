@@ -46,15 +46,25 @@ project_slug() {
   printf '%s\n' "$slug"
 }
 
-# init-project is no-clobber: an existing non-empty slug is authoritative so the
-# every-turn bootstrap cannot overwrite a slug chosen in Phase 0.
+# init-project has two intents:
+#   * with a name  -> intentional set; overrides any existing (e.g. derived) slug
+#   * without a name -> no-clobber bootstrap; only derive from the directory name
+#     when no slug exists yet, so the every-turn bootstrap never overwrites a
+#     real name chosen in Phase 0.
 init_project() {
   mkdir -p "$PLANNING_DIR"
+  local name="${1:-}"
+
+  if [ -n "$name" ]; then
+    write_slug "$name"
+    return 0
+  fi
+
   if [ -s "$SLUG_FILE" ]; then
     cat "$SLUG_FILE"
     return 0
   fi
-  write_slug "${1:-}"
+  write_slug ""
 }
 
 has_frontmatter() {

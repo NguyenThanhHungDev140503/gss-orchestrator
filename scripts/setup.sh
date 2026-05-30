@@ -203,7 +203,9 @@ fi
 # Initialize project slug (no-clobber) before template files are created so they
 # pick up the correct slug. Frontmatter + bases are written after, below.
 if [ -x "$OBSIDIAN_META" ]; then
-  bash "$OBSIDIAN_META" init-project "$(basename "$PWD")" >/dev/null
+  # No-clobber: derive a slug from the directory name only if none exists yet.
+  # Phase 0 sets the real project name via: init-project "<project name>".
+  bash "$OBSIDIAN_META" init-project >/dev/null
   echo -e "  ${GREEN}✓${NC} Obsidian project slug"
 fi
 

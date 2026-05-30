@@ -559,8 +559,10 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh init-project "<project 
 cat .planning/.project_slug
 ```
 
-`init-project` is no-clobber: once a slug exists it is authoritative, so the
-every-turn bootstrap does not overwrite a slug chosen in Phase 0.
+`init-project "<name>"` sets the slug intentionally and overrides a placeholder
+derived earlier from the directory name. The argument-less `init-project` used by
+the every-turn bootstrap is no-clobber: it only derives a slug from the directory
+when none exists yet, so it never overwrites the name chosen here in Phase 0.
 
 ### Normalizing Frontmatter
 
