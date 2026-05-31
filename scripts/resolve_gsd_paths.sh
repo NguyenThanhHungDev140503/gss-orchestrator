@@ -29,11 +29,40 @@ resolve_current_phase() {
   if [ ! -f "$STATE_FILE" ]; then
     echo "" ; return
   fi
-  # GSD ghi "Current Phase: XX" hoặc "Active: XX" trong STATE.md
-  grep -iE "^current phase:|^active phase:|^phase:" "$STATE_FILE" 2>/dev/null \
-    | head -1 | sed 's/.*: *//' | tr -d '[:space:]' \
-    || grep -oE '[0-9]{2}-[a-z-]+' "$STATE_FILE" 2>/dev/null | head -1 \
-    || ls "$PLANNING_DIR/phases/" 2>/dev/null | sort | tail -1
+
+  local candidate
+
+  # GSD ghi "Current Phase: 01-demo" hoặc "Active: 01-demo" trong STATE.md.
+  # Chỉ nhận label value nếu toàn bộ value là phase id, tránh prose như
+  # "Phase: 1 of 4 (MVP ...)" bị hiểu thành tên thư mục.
+  candidate="$(
+    awk '
+      {
+        line = $0
+        lowered = tolower(line)
+        if (lowered ~ /^[[:space:]]*(current phase|active phase|active|phase):/) {
+          sub(/^[^:]*:[[:space:]]*/, "", line)
+          sub(/[[:space:]]+$/, "", line)
+          if (line ~ /^[0-9][0-9]-[A-Za-z][A-Za-z0-9-]*$/) {
+            print line
+            exit
+          }
+        }
+      }
+    ' "$STATE_FILE" 2>/dev/null || true
+  )"
+  if [ -n "$candidate" ]; then
+    echo "$candidate"
+    return
+  fi
+
+  candidate="$(grep -oE '[0-9]{2}-[A-Za-z][A-Za-z0-9-]*' "$STATE_FILE" 2>/dev/null | head -1 || true)"
+  if [ -n "$candidate" ]; then
+    echo "$candidate"
+    return
+  fi
+
+  ls "$PLANNING_DIR/phases/" 2>/dev/null | sort | tail -1
 }
 
 # ── Tìm PLAN.md hiện tại trong phase ─────────────────────────────────────
