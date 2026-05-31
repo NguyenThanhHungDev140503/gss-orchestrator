@@ -316,12 +316,18 @@ gsd-gstack-sp-orchestrator/
 ```text
 <project>/.planning/
 ├── GSS_STATE.json              # Loop state, current phase
+├── .project_slug               # Obsidian tag-safe project slug
 ├── REQUIREMENTS.md             # User input
-├── RESEARCH.md                 # Phase 0 output
+├── RESEARCH.md                 # Phase 0 output (research source of truth)
 ├── ROADMAP.md                  # Phase 1 output (GSD)
 ├── DECISIONS.md                # Append-only audit log
 ├── shared_context.md           # Cross-phase context
 ├── config.json                 # Loop config (max iterations, ...)
+├── bases/                      # Obsidian Bases query files
+│   ├── project-dashboard.base
+│   ├── phases.base
+│   ├── research.base
+│   └── decisions.base
 └── phases/<phase-id>/
     ├── PLAN.md                 # GSD output cho phase này
     ├── STATE.md                # Phase state
@@ -329,6 +335,22 @@ gsd-gstack-sp-orchestrator/
     ├── OPEN_QUESTIONS.md       # Blocked questions (Phase 3b)
     └── logs/                   # Full GStack/QA transcripts
 ```
+
+---
+
+## Obsidian-first compatible mode
+
+GSS giữ nguyên các file runtime hiện có làm nguồn sự thật và thêm Obsidian
+frontmatter cùng các file Bases xung quanh chúng. `.planning/RESEARCH.md` vẫn là
+artifact nghiên cứu mà GSD tiêu thụ; ở chế độ tương thích này research không bị
+tách thành các file `research/*.md`.
+
+- Slug dự án được tạo một lần ở Phase 0 và lưu tại `.planning/.project_slug`.
+- Frontmatter được quản lý bởi `scripts/obsidian_meta.sh` (`init-project`,
+  `normalize-known`, `ensure-frontmatter`).
+- Các file truy vấn nằm trong `.planning/bases/` và được tạo bởi
+  `scripts/obsidian_meta.sh write-bases`.
+- Mở thư mục `.planning/` như một Obsidian vault (hoặc subfolder) để duyệt.
 
 ---
 

@@ -11,6 +11,7 @@ set -e
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+OBSIDIAN_META="$SKILL_DIR/scripts/obsidian_meta.sh"
 
 sync_agents() {
   local src="$SKILL_DIR/agents"
@@ -199,6 +200,15 @@ else
   echo -e "  ${YELLOW}↺${NC} .planning/config.json exists — skipped"
 fi
 
+# Initialize project slug (no-clobber) before template files are created so they
+# pick up the correct slug. Frontmatter + bases are written after, below.
+if [ -x "$OBSIDIAN_META" ]; then
+  # No-clobber: derive a slug from the directory name only if none exists yet.
+  # Phase 0 sets the real project name via: init-project "<project name>".
+  bash "$OBSIDIAN_META" init-project >/dev/null
+  echo -e "  ${GREEN}✓${NC} Obsidian project slug"
+fi
+
 # GSS_STATE.json
 if [ ! -f ".planning/GSS_STATE.json" ]; then
   cat > .planning/GSS_STATE.json << EOF
@@ -240,6 +250,14 @@ EOF
   echo -e "  ${GREEN}✓${NC} .planning/shared_context.md"
 else
   echo -e "  ${YELLOW}↺${NC} .planning/shared_context.md exists — skipped"
+fi
+
+# Normalize Obsidian frontmatter on all known artifacts (incl. the freshly
+# copied DECISIONS.md template) and regenerate Bases query files.
+if [ -x "$OBSIDIAN_META" ]; then
+  bash "$OBSIDIAN_META" normalize-known >/dev/null
+  bash "$OBSIDIAN_META" write-bases >/dev/null
+  echo -e "  ${GREEN}✓${NC} Obsidian metadata normalized"
 fi
 
 # ── 5. Browser automation dependencies ────────────────────────────────────

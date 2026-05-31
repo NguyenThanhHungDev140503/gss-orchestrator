@@ -30,6 +30,33 @@ Read state at every turn:
 cat .planning/GSS_STATE.json 2>/dev/null || echo '{"loop_state":"IDLE"}'
 ```
 
+## BOOTSTRAP — RESOLVE SKILL HOME FIRST
+
+Resolve where this skill is installed (project-local or global), cache the
+absolute path in `.planning/.gss_home`, then run setup. Every later command
+reads `$(cat .planning/.gss_home)/scripts/...`, so it works regardless of
+install location.
+
+```bash
+# >>> gss-resolve
+mkdir -p .planning
+SKILL_NAME="gsd-gstack-sp-orchestrator"
+for cand in ".agents/skills/$SKILL_NAME" "$HOME/.agents/skills/$SKILL_NAME" \
+            ".claude/skills/$SKILL_NAME" "$HOME/.claude/skills/$SKILL_NAME"; do
+  if [ -f "$cand/scripts/setup.sh" ]; then
+    GSS_HOME="$(cd "$cand" && pwd)"
+    break
+  fi
+done
+if [ -z "${GSS_HOME:-}" ]; then
+  echo "ERROR: cannot locate $SKILL_NAME (looked in .agents and ~/.agents)" >&2
+else
+  printf '%s\n' "$GSS_HOME" > .planning/.gss_home
+  bash "$GSS_HOME/scripts/setup.sh"
+fi
+# <<< gss-resolve
+```
+
 ---
 
 ## HOW TO LOAD SKILLS IN CODEX
@@ -100,12 +127,14 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUT
 Pre-planning web research feeds GSD with a compact `RESEARCH.md` so it does not
 need to dispatch nested research agents.
 
-Save requirements:
+Save requirements and initialize Obsidian metadata:
 ```bash
 mkdir -p .planning
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh init-project "<project-name>"
 cat > .planning/REQUIREMENTS.md << 'EOF'
 [paste user's requirements here]
 EOF
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 ```
 
 Spawn one researcher subagent. Its **initial message must begin with**:
@@ -131,7 +160,7 @@ RESEARCH_COMPLETE
 After `RESEARCH_COMPLETE`:
 ```bash
 ls -la .planning/RESEARCH.md
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "PLANNING"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "PLANNING"
 ```
 
 → PHASE 1
@@ -173,8 +202,14 @@ PLANNING_DONE: [current milestone name]
 After subagent outputs `PLANNING_DONE`:
 ```bash
 cat .planning/STATE.md
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>"
 ```
+
+Research stays in the single file `.planning/RESEARCH.md` (compatible mode); it
+is not split into per-dimension files. Frontmatter and `.planning/bases/*.base`
+are managed by `scripts/obsidian_meta.sh`.
 
 ---
 
@@ -184,7 +219,7 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_R
 
 Read milestone plan:
 ```bash
-source .agents/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 cat "$GSD_PLAN_FILE" 2>/dev/null || cat .planning/ROADMAP.md
 ```
 
@@ -208,7 +243,7 @@ CEO_DONE
 
 After `CEO_DONE`, log decisions:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "ceo-review" "[extracted numbered decisions]"
 ```
 
@@ -235,12 +270,12 @@ ENG_DONE
 
 After `ENG_DONE`:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "eng-review" "[extracted numbered decisions]"
 
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_BRAINSTORM"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_BRAINSTORM"
 
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 
 ---
@@ -281,9 +316,9 @@ After subagent output:
 
 **If `BRAINSTORM_DONE`:**
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt_codex.sh
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+bash $(cat .planning/.gss_home)/scripts/write_exec_prompt_codex.sh
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 → PHASE 4
 
@@ -306,9 +341,9 @@ QA_ANSWER_DONE
 
 After `QA_ANSWER_DONE`:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "brainstorm-gate" "[role + decision]"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decision]"
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh "[decision]"
 ```
 → Re-spawn brainstorming subagent (return to top of Phase 3)
 
@@ -320,8 +355,8 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decisi
 
 Build the Codex execution prompt:
 ```bash
-source .agents/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/write_exec_prompt_codex.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
+bash $(cat .planning/.gss_home)/scripts/write_exec_prompt_codex.sh
 cat "$GSD_EXEC_PROMPT"
 ```
 
@@ -341,7 +376,7 @@ After subagent completes:
 
 **If output contains `PHASE_COMPLETE`:**
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_QA"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_QA"
 ```
 → PHASE 5
 
@@ -356,14 +391,14 @@ grep -c "^\- \[ \]" "$GSD_PLAN_FILE" && echo "tasks pending" || echo "all done"
 ### Phase 4b — Route Blocked Question
 
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/route_question.sh "<question>"
+bash $(cat .planning/.gss_home)/scripts/route_question.sh "<question>"
 ```
 
 Route by role (CEO or ENG), spawn GStack subagent, receive `QA_ANSWER_DONE`:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/log_decision.sh \
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "sp-blocked" "[role + decision]"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decision]"
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh "[decision]"
 ```
 → Re-spawn execution subagent (return to Phase 4)
 
@@ -374,7 +409,7 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "[decisi
 **Trigger:** `loop_state` is `GSTACK_QA`
 
 ```bash
-source .agents/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 grep -A10 -i "acceptance criteria" "$GSD_PLAN_FILE" | head -15
 ```
 
@@ -403,14 +438,14 @@ After `QA_DONE`:
 
 **If `QA_STATUS: PASSED`:**
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSD_DISPATCH"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
 ```
 → PHASE 6
 
 **If `QA_STATUS: FAILED`:**
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/inject_answer.sh "QA FAILED: [issues]"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "SP_EXECUTING"
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh "QA FAILED: [issues]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 ```
 → Re-spawn execution subagent
 
@@ -436,7 +471,7 @@ Roadmap:
 After GSD completion/progress finishes, run the deterministic sync script for
 completed milestone before returning NEXT_PHASE or DELIVERED:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "[milestone name]"
+bash $(cat .planning/.gss_home)/scripts/mark_milestone_done.sh "[milestone name]"
 ```
 
 Return only one of:
@@ -446,18 +481,18 @@ DELIVERED
 
 **If `NEXT_PHASE: <id>`:**
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_shared_context.sh
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "GSTACK_REVIEW" "<id>"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --milestone
+bash $(cat .planning/.gss_home)/scripts/mark_milestone_done.sh "<completed-milestone-id>"
+bash $(cat .planning/.gss_home)/scripts/update_shared_context.sh
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<id>"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh --milestone
 ```
 → Return to PHASE 2
 
 **If `DELIVERED`:**
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/mark_milestone_done.sh "<completed-milestone-id>"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/update_state.sh "DELIVERED"
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
+bash $(cat .planning/.gss_home)/scripts/mark_milestone_done.sh "<completed-milestone-id>"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "DELIVERED"
+bash $(cat .planning/.gss_home)/scripts/print_summary.sh
 ```
 
 ---
@@ -466,12 +501,12 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/print_summary.sh
 
 After every subagent completion, run:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 
 After each phase, run:
 ```bash
-bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --phase
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh --phase
 ```
 
 ---
@@ -481,6 +516,7 @@ bash .agents/skills/gsd-gstack-sp-orchestrator/scripts/checkpoint.sh --phase
 | File | Written by | Read by |
 |------|-----------|---------|
 | `REQUIREMENTS.md` | Orchestrator | Planning subagent (GSD) |
+| `RESEARCH.md` | Researcher subagent | Planning subagent (GSD) |
 | `ROADMAP.md` | Planning subagent (GSD) | Orchestrator, review subagents |
 | `PLAN.md` (draft) | Planning subagent (GSD) | Brainstorming gate subagent |
 | `DECISIONS.md` | Review subagents (GStack) | Brainstorming gate, executor |
@@ -498,3 +534,71 @@ cat .planning/STATE.md
 ```
 
 Resume from `loop_state` shown. Orchestrator identity resumes immediately.
+
+---
+
+## OBSIDIAN DOCUMENT STANDARD
+
+All `.planning/` documents carry Obsidian YAML frontmatter so they can be queried
+via `.planning/bases/*.base` in any Obsidian vault. Frontmatter is written and
+maintained by `scripts/obsidian_meta.sh` — the orchestrator and subagents should
+not hand-write it.
+
+This orchestrator runs in **compatible mode**: research lives in the single file
+`.planning/RESEARCH.md` (frontmatter `type: research`, `research_dimension:
+summary`). Research is not split into per-dimension files under a research/
+subfolder.
+
+### Project Slug
+
+Derived once in Phase 0 and stored in `.planning/.project_slug`. Format:
+lowercase, hyphenated, alphanumeric only.
+
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh init-project "<project name>"
+cat .planning/.project_slug
+```
+
+`init-project "<name>"` sets the slug intentionally and overrides a placeholder
+derived earlier from the directory name. The argument-less `init-project` used by
+the every-turn bootstrap is no-clobber: it only derives a slug from the directory
+when none exists yet, so it never overwrites the name chosen here in Phase 0.
+
+### Normalizing Frontmatter
+
+After any subagent writes or updates a known artifact, normalize metadata:
+
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+```
+
+`normalize-known` manages frontmatter for these document types:
+
+| File | type |
+|------|------|
+| `REQUIREMENTS.md` | `requirements` |
+| `RESEARCH.md` | `research` (`research_dimension: summary`) |
+| `PROJECT.md` | `project` |
+| `ROADMAP.md` | `roadmap` |
+| `DECISIONS.md` | `decision-log` |
+| `shared_context.md` | `shared-context` |
+| `CHECKPOINT_HISTORY.md` | `checkpoint-log` |
+| `phases/<phase>/PLAN.md` | `plan` |
+| `phases/<phase>/DECISIONS.md` | `decision-log` |
+| `phases/<phase>/BRAINSTORM_DOC.md` | `brainstorm` |
+| `phases/<phase>/EXEC_PROMPT.md` | `execution-prompt` |
+
+The helper preserves existing body content and unmanaged frontmatter fields,
+keeps the original `created` date, refreshes `updated`, and adds `project`,
+`phase`, and wikilink fields where applicable.
+
+### Bases Files
+
+Generated into `.planning/bases/` by `scripts/obsidian_meta.sh write-bases`:
+
+| File | Queries |
+|------|---------|
+| `project-dashboard.base` | All documents grouped by type |
+| `phases.base` | All PLAN.md files with status |
+| `research.base` | Research docs by dimension |
+| `decisions.base` | Decision logs grouped by phase |

@@ -28,7 +28,7 @@ The orchestrator never sees GStack prose — only the extracted decisions in JSO
 ## BEFORE RUNNING REVIEW
 
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 mkdir -p "$GSD_LOG_DIR"
 ```
 
@@ -144,3 +144,13 @@ After receiving GStack output:
 - Include role preambles or process commentary in decisions
 - Return log file contents — only the path
 - Contradict decisions already in DECISIONS.md without flagging explicitly
+
+## OBSIDIAN METADATA
+
+Before appending decisions, ensure the decision file has Obsidian frontmatter
+(`log_decision.sh` and `summarize_gstack.sh` already do this; call directly if
+appending manually):
+
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh ensure-frontmatter "$GSD_DECISIONS_FILE" decision-log "$GSD_CURRENT_PHASE" 2>/dev/null || true
+```

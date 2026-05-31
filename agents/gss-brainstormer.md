@@ -35,7 +35,7 @@ Skill("superpowers:brainstorming")
 
 Then resolve paths:
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 mkdir -p "$GSD_LOG_DIR"
 ```
 
@@ -170,3 +170,12 @@ Return ONLY the JSON below. No prose, no design rationale, no PLAN.md content.
 - Add new tasks to PLAN.md (only add detail to existing tasks)
 - Proceed past HARD GATE by guessing
 - Invoke `superpowers:test-driven-development` — that belongs to gss-executor
+
+## OBSIDIAN METADATA
+
+After writing `BRAINSTORM_DOC.md` or refining `PLAN.md`, normalize Obsidian
+frontmatter if the helper is available:
+
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
+```

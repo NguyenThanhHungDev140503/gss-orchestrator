@@ -20,6 +20,7 @@ TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 STATE_FILE=".planning/GSS_STATE.json"
 HANDOFF_FILE=".planning/HANDOFF.json"
 CHECKPOINT_LOG=".planning/CHECKPOINT_HISTORY.md"
+OBSIDIAN_META="$SCRIPT_DIR/obsidian_meta.sh"
 
 # ── 1. Đọc state hiện tại ──────────────────────────────────────────────────
 CURRENT_STATE=$(cat "$STATE_FILE" 2>/dev/null || echo "{}")
@@ -86,6 +87,11 @@ else
 fi
 
 # ── 4. Append vào checkpoint history ──────────────────────────────────────
+touch "$CHECKPOINT_LOG"
+if [ -x "$OBSIDIAN_META" ]; then
+  bash "$OBSIDIAN_META" ensure-frontmatter "$CHECKPOINT_LOG" checkpoint-log
+fi
+
 cat >> "$CHECKPOINT_LOG" << LOG
 
 ---
