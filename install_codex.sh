@@ -164,6 +164,7 @@ dependencies:
     - gsd-progress
     - plan-ceo-review
     - plan-eng-review
+    - qa
     - test-driven-development
     - verification-before-completion
 policy:

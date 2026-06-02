@@ -88,6 +88,12 @@ $plan-eng-review
 [the rest of the instructions]
 ```
 
+QA review subagent:
+```text
+$qa
+[the rest of the instructions]
+```
+
 Brainstorming gate subagent:
 ```text
 $brainstorming
@@ -413,8 +419,9 @@ source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 grep -A10 -i "acceptance criteria" "$GSD_PLAN_FILE" | head -15
 ```
 
-Spawn one plain validation subagent (no GStack skill here):
+Spawn one GStack QA review subagent. Its **initial message must begin with**:
 ```text
+$qa
 Validate this completed milestone against PLAN.md acceptance criteria.
 
 Read:
@@ -424,9 +431,10 @@ Read:
 - shared_context.md
 
 Then:
-1. Run the relevant test commands
-2. Check whether all unchecked tasks are done
-3. Compare acceptance criteria against observed coverage
+1. Use the GStack QA role to decide what validation is required
+2. Run or request the relevant test commands/checks
+3. Check whether all unchecked tasks are done
+4. Compare acceptance criteria against observed coverage
 
 Return only:
 QA_STATUS: PASSED or FAILED

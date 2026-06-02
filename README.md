@@ -75,7 +75,7 @@ Giải pháp của GSS Orchestrator dựa trên 4 nguyên tắc:
 Trạng thái lưu tại `.planning/GSS_STATE.json` và được đọc đầu mỗi turn:
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
                                         ↕
                                   GStack routing cho blocking Qs
                                   rồi quay lại SP_EXECUTING
@@ -87,8 +87,9 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA 
 | `RESEARCH` | User gửi requirements | `gss-researcher` |
 | `PLANNING` | RESEARCH.md đã tạo | `gss-gsd-runner` (mode `PLANNING`) |
 | `GSTACK_REVIEW` | PLAN.md đã có | `gss-reviewer` ×2 (CEO → Engineering) |
+| `SP_BRAINSTORM` | GStack review đã có decisions | `gss-brainstormer` |
 | `SP_EXECUTING` | EXEC_PROMPT.md đã ghi | `gss-executor` (qua Task tool) |
-| `GSTACK_QA` | Phase báo `PHASE_COMPLETE` | `gss-qa` |
+| `GSTACK_QA` | Phase báo `PHASE_COMPLETE` | `gss-reviewer` (Review type `QA`) |
 | `GSD_DISPATCH` | QA pass | `gss-gsd-runner` (mode `DISPATCH`) |
 | `DELIVERED` | Hết phase trong roadmap | (in summary, kết thúc) |
 
@@ -101,12 +102,13 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_EXECUTING → GSTACK_QA 
 | 0 — RESEARCH | `gss-researcher` | (không có — dùng `WebSearch`/`WebFetch` trực tiếp) | — |
 | 1 — PLANNING | `gss-gsd-runner` | `gsd-new-project` hoặc `gsd-plan-phase` | GSD |
 | 2 — GSTACK_REVIEW | `gss-reviewer` | `plan-ceo-review`, rồi `plan-eng-review` | GStack |
-| 3 — SP_EXECUTING | `gss-executor` | `superpowers:test-driven-development` | Superpowers |
-| 3b — Blocked Q | `gss-reviewer` | `plan-ceo-review` / `plan-eng-review` / `qa` (theo router) | GStack |
-| 4 — GSTACK_QA | `gss-qa` | (không có — tự chạy `npm test` / `pytest` / `go test`) | — |
-| 5 — GSD_DISPATCH | `gss-gsd-runner` | `gsd-plan-phase` (cho phase tiếp theo) | GSD |
+| 3 — SP_BRAINSTORM | `gss-brainstormer` | `brainstorming`, `writing-plans` | Superpowers |
+| 4 — SP_EXECUTING | `gss-executor` | `superpowers:test-driven-development` | Superpowers |
+| 4b — Blocked Q | `gss-reviewer` | `plan-ceo-review` / `plan-eng-review` / `qa` (theo router) | GStack |
+| 5 — GSTACK_QA | `gss-reviewer` | `gstack:qa` / `qa` | GStack |
+| 6 — GSD_DISPATCH | `gss-gsd-runner` | `gsd-plan-phase` (cho phase tiếp theo) | GSD |
 
-**Lưu ý:** `gss-researcher` và `gss-qa` cố ý KHÔNG có `Skill` tool. Chúng tự encapsulate logic (web search, run tests) thay vì delegate cho plugin. Đây là design quyết, không phải sót.
+**Lưu ý:** `gss-researcher` cố ý KHÔNG có `Skill` tool vì nó chỉ tạo research context. QA cuối milestone phải đi qua GStack QA role bằng `gss-reviewer`; test runner cục bộ chỉ là bằng chứng đầu vào, không phải QA authority.
 
 ---
 
@@ -281,9 +283,9 @@ gsd-gstack-sp-orchestrator/
 ├── agents/                     # 5 wrapper subagents
 │   ├── gss-researcher.md       #   Phase 0 — web research
 │   ├── gss-gsd-runner.md       #   Phase 1, 5 — GSD wrapper
-│   ├── gss-reviewer.md         #   Phase 2, 3b — GStack wrapper
+│   ├── gss-reviewer.md         #   Phase 2, 3b, 5 — GStack wrapper
 │   ├── gss-executor.md         #   Phase 3 — Superpowers TDD
-│   └── gss-qa.md               #   Phase 4 — test runner
+│   └── gss-qa.md               #   Fallback/local QA evidence collector
 ├── scripts/                    # 15 deterministic helpers
 │   ├── setup.sh                #   Bootstrap deps + .planning/ + browser automation
 │   ├── install_browser_automation_deps.sh
