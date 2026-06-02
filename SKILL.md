@@ -524,30 +524,40 @@ If all done → treat as PHASE_COMPLETE → Proceed to PHASE 5
 
 **Trigger:** `loop_state` is `GSTACK_QA`
 
-### Step 5.1 — Dispatch gss-qa subagent
+### Step 5.1 — Dispatch gss-reviewer for GStack QA
 
 ```
 Agent(
-  subagent_type: "gss-qa",
-  prompt: "Validate the current milestone against its acceptance criteria.
-           Read $GSD_PLAN_FILE for criteria, run the project's test
-           suite, check git log for commits, and return the QA verdict
-           JSON. Do not return test output — only the verdict."
+  subagent_type: "gss-reviewer",
+  prompt: "Review type: QA
+
+           Validate the completed milestone against PLAN.md acceptance criteria.
+
+           Read:
+           - $GSD_PLAN_FILE
+           - $GSD_DECISIONS_FILE
+           - $GSD_PHASE_DIR/BRAINSTORM_DOC.md
+           - .planning/shared_context.md
+
+           Invoke the GStack QA skill via the Skill tool, follow its full
+           validation workflow, run or request the relevant tests/checks, then
+           return the JSON result with pass/fail verdict and extracted issues only.
+           Do not return full test output."
 )
 ```
 
 ### Step 5.2 — Parse QA result
 
-**If `STATUS: PASSED`:**
+**If GStack QA returns `status: PASSED`:**
 ```bash
 bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
 ```
 → Proceed to PHASE 6
 
-**If `STATUS: FAILED`:**
+**If GStack QA returns `status: FAILED`:**
 ```bash
 bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
-  "QA FAILED: [paste failures[] from gss-qa JSON]"
+  "QA FAILED: [paste issues[] from GStack QA JSON]"
 bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 ```
 → Return to PHASE 4 (re-dispatch gss-executor with failure context)
@@ -601,7 +611,7 @@ bash $(cat .planning/.gss_home)/scripts/print_summary.sh
 2. **Subagent dispatch, not inline Skill invocation.** Never call the `Skill`
    tool directly on GSD/GStack/Superpowers from the orchestrator context.
    Always dispatch through a wrapper subagent (`gss-gsd-runner`, `gss-reviewer`,
-   `gss-brainstormer`, `gss-executor`, `gss-qa`) using Agent/Task tool.
+   `gss-brainstormer`, `gss-executor`) using Agent/Task tool.
    The subagent handles Skill invocation inside its own isolated context and
    returns compact JSON.
 
