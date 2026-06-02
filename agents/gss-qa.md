@@ -23,7 +23,7 @@ The orchestrator receives only pass/fail verdict — never full test output.
 ## EXECUTION PROTOCOL
 
 ```bash
-source .claude/skills/gsd-gstack-sp-orchestrator/scripts/resolve_gsd_paths.sh
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
 LOG_FILE="$GSD_LOG_DIR/qa_$(date +%s).log"
 mkdir -p "$GSD_LOG_DIR"
 ```

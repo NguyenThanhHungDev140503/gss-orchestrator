@@ -104,3 +104,12 @@ After writing the file:
 - Max 5 WebFetch calls total
 - Output file max 500 lines — synthesize, do not dump
 - No pseudocode or tutorials — actionable decisions only
+
+## OBSIDIAN METADATA
+
+After writing `.planning/RESEARCH.md` (which remains the research source of truth),
+normalize Obsidian frontmatter if the helper is available:
+
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known 2>/dev/null || true
+```

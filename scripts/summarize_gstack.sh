@@ -16,6 +16,7 @@ GREEN='\033[0;32m'; NC='\033[0m'
 DECISIONS_FILE="${GSD_DECISIONS_FILE:-.planning/DECISIONS.md}"
 GLOBAL_FILE="${GSD_GLOBAL_DECISIONS:-.planning/DECISIONS.md}"
 LOG_DIR="${GSD_LOG_DIR:-.planning/logs}"
+OBSIDIAN_META="$SCRIPT_DIR/obsidian_meta.sh"
 mkdir -p "$LOG_DIR"
 
 GSTACK_OUTPUT="${1:-}"
@@ -41,6 +42,13 @@ SUMMARY=$(cat "$SUMMARY_RESULT")
 TS=$(date -u +"%Y-%m-%d %H:%M UTC")
 
 # Log vào DECISIONS.md
+mkdir -p "$(dirname "$DECISIONS_FILE")" "$(dirname "$GLOBAL_FILE")"
+touch "$DECISIONS_FILE" "$GLOBAL_FILE"
+if [ -x "$OBSIDIAN_META" ]; then
+  bash "$OBSIDIAN_META" ensure-frontmatter "$DECISIONS_FILE" decision-log "${GSD_CURRENT_PHASE:-}"
+  bash "$OBSIDIAN_META" ensure-frontmatter "$GLOBAL_FILE" decision-log
+fi
+
 {
   echo ""
   echo "---"
