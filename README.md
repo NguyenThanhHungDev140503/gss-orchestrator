@@ -80,6 +80,9 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK
                                   GStack routing   skip if no devex_surface               GStack routing
                                   cho blocking Qs                                          cho design Qs
                                   └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
+
+Validation failure path:
+GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS → SP_DEBUGGING → SP_EXECUTING
 ```
 
 | State | Trigger | Subagent dispatch |
@@ -95,6 +98,7 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK
 | `GSTACK_QA` | Phase báo `PHASE_COMPLETE` | `gss-reviewer` (Review type `QA`) |
 | `GSTACK_DESIGN_QA` | Functional QA pass | `gss-designer` (mode `DESIGN_QA`) |
 | `GSTACK_DOCS` | Functional + design QA pass | `gss-docs` |
+| `SP_DEBUGGING` | QA/design/docs failure | `gss-debugger` |
 | `GSD_DISPATCH` | QA + design + docs pass | `gss-gsd-runner` (mode `DISPATCH`) |
 | `DELIVERED` | Hết phase trong roadmap | (in summary, kết thúc) |
 
@@ -115,6 +119,7 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK
 | 5 — GSTACK_QA | `gss-reviewer` | `gstack:qa` / `qa` | GStack |
 | 5.5 — GSTACK_DESIGN_QA | `gss-designer` | `design-review` | GStack |
 | 5.6 — GSTACK_DOCS | `gss-docs` | `document-release`, optional `document-generate` / `make-pdf` | GStack |
+| 5.7 — SP_DEBUGGING | `gss-debugger` | `superpowers:systematic-debugging` | Superpowers |
 | 6 — GSD_DISPATCH | `gss-gsd-runner` | `gsd-plan-phase` (cho phase tiếp theo) | GSD |
 
 **Lưu ý:** `gss-researcher` cố ý KHÔNG có `Skill` tool vì nó chỉ tạo research context. QA cuối milestone phải đi qua GStack QA role bằng `gss-reviewer`; test runner cục bộ chỉ là bằng chứng đầu vào, không phải QA authority.
@@ -296,6 +301,7 @@ gsd-gstack-sp-orchestrator/
 │   ├── gss-devex-reviewer.md   #   Phase 2.3 — GStack DX wrapper
 │   ├── gss-designer.md         #   Phase 2.5, 5.5 — GStack design wrapper
 │   ├── gss-docs.md             #   Phase 5.6 — GStack docs wrapper
+│   ├── gss-debugger.md         #   Phase 5.7 — Superpowers root-cause wrapper
 │   ├── gss-executor.md         #   Phase 3 — Superpowers TDD
 │   └── gss-qa.md               #   Fallback/local QA evidence collector
 ├── scripts/                    # 15 deterministic helpers
@@ -350,6 +356,7 @@ gsd-gstack-sp-orchestrator/
     ├── DEVEX_REVIEW.md         # Pre-build developer experience review
     ├── EXEC_PROMPT.md          # Build từ PLAN.md cho Superpowers
     ├── DESIGN_QA.md            # Post-build design-review report
+    ├── DEBUG_REPORT.md         # Root-cause report before retry fixes
     ├── DOCS_REPORT.md          # document-release/doc generation report
     ├── OPEN_QUESTIONS.md       # Blocked questions (Phase 3b)
     └── logs/                   # Full GStack/QA transcripts

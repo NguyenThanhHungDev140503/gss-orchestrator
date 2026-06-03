@@ -158,6 +158,11 @@ EOF
       echo 'plan: "[[PLAN]]"'
       echo 'decisions: "[[DECISIONS]]"'
       ;;
+    debug-report)
+      echo 'plan: "[[PLAN]]"'
+      echo 'decisions: "[[DECISIONS]]"'
+      echo 'brainstorm: "[[BRAINSTORM_DOC]]"'
+      ;;
     documentation)
       if [ -n "$phase" ]; then
         echo 'plan: "[[PLAN]]"'
@@ -269,6 +274,7 @@ normalize_known() {
     ensure_frontmatter "$phase_dir/DESIGN.md" design "$phase"
     ensure_frontmatter "$phase_dir/DESIGN_QA.md" design-qa "$phase"
     ensure_frontmatter "$phase_dir/DEVEX_REVIEW.md" devex-review "$phase"
+    ensure_frontmatter "$phase_dir/DEBUG_REPORT.md" debug-report "$phase"
     ensure_frontmatter "$phase_dir/DOCS_REPORT.md" documentation "$phase"
     ensure_frontmatter "$phase_dir/BRAINSTORM_DOC.md" brainstorm "$phase"
     ensure_frontmatter "$phase_dir/EXEC_PROMPT.md" execution-prompt "$phase"

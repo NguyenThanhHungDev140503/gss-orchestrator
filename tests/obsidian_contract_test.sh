@@ -106,6 +106,10 @@ cat > "$tmpdir/.planning/phases/01-demo/DEVEX_REVIEW.md" <<'EOF'
 # DX Review
 TTHW: 3 steps, ~2 min.
 EOF
+cat > "$tmpdir/.planning/phases/01-demo/DEBUG_REPORT.md" <<'EOF'
+# Debug Report
+Root cause identified before retry.
+EOF
 
 (
   cd "$tmpdir"
@@ -137,6 +141,8 @@ assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DESIGN_QA.md" "design-
 assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DOCS_REPORT.md" "documentation"
 assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DEVEX_REVIEW.md" "devex-review"
 assert_contains "$tmpdir/.planning/phases/01-demo/DEVEX_REVIEW.md" "phase: 01-demo"
+assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DEBUG_REPORT.md" "debug-report"
+assert_contains "$tmpdir/.planning/phases/01-demo/DEBUG_REPORT.md" "phase: 01-demo"
 
 assert_file_exists "$tmpdir/.planning/bases/project-dashboard.base"
 assert_file_exists "$tmpdir/.planning/bases/phases.base"
@@ -185,12 +191,16 @@ assert_contains "$ROOT/agents/gss-designer.md" "obsidian_meta.sh"
 assert_contains "$ROOT/agents/gss-designer.md" "ensure-frontmatter"
 assert_contains "$ROOT/agents/gss-docs.md" "obsidian_meta.sh"
 assert_contains "$ROOT/agents/gss-docs.md" "ensure-frontmatter"
+assert_contains "$ROOT/agents/gss-debugger.md" "obsidian_meta.sh"
+assert_contains "$ROOT/agents/gss-debugger.md" "ensure-frontmatter"
 assert_not_contains "$ROOT/agents/gss-devex-reviewer.md" ".claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh"
 assert_not_contains "$ROOT/agents/gss-designer.md" ".claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh"
 assert_not_contains "$ROOT/agents/gss-docs.md" ".claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh"
+assert_not_contains "$ROOT/agents/gss-debugger.md" ".claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh"
 assert_not_contains "$ROOT/agents/gss-devex-reviewer.md" "write frontmatter manually"
 assert_not_contains "$ROOT/agents/gss-designer.md" "write frontmatter manually"
 assert_not_contains "$ROOT/agents/gss-docs.md" "write frontmatter manually"
+assert_not_contains "$ROOT/agents/gss-debugger.md" "write frontmatter manually"
 
 assert_contains "$ROOT/SKILL.md" "scripts/obsidian_meta.sh"
 assert_contains "$ROOT/SKILL.md" ".planning/RESEARCH.md"
@@ -203,6 +213,7 @@ assert_not_contains "$ROOT/SKILL.md" "research/PITFALLS.md"
 assert_contains "$ROOT/SKILL.codex.md" "obsidian_meta.sh"
 assert_contains "$ROOT/SKILL.codex.md" 'phases/<phase>/DESIGN_QA.md'
 assert_contains "$ROOT/SKILL.codex.md" 'DEVEX_REVIEW.md'
+assert_contains "$ROOT/SKILL.codex.md" 'DEBUG_REPORT.md'
 assert_contains "$ROOT/SKILL.codex.md" 'phases/<phase>/DOCS_REPORT.md'
 assert_contains "$ROOT/README.md" ".planning/.project_slug"
 assert_contains "$ROOT/README.md" ".planning/bases/"

@@ -72,6 +72,9 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK
                                   │
                                   └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
                                                    NEXT_PHASE loop
+
+Failure retry path:
+GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS failure → SP_DEBUGGING → SP_EXECUTING
 ```
 
 ---
@@ -658,10 +661,10 @@ bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_QA"
 **If GStack QA returns `status: FAILED`:**
 ```bash
 bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
-  "QA FAILED: [paste issues[] from GStack QA JSON]"
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+  "QA FAILED: [paste issues[] from GStack QA JSON]. Run systematic debugging before fixing."
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_DEBUGGING"
 ```
-→ Return to PHASE 4 (re-dispatch gss-executor with failure context)
+→ Proceed to PHASE 5.7 (systematic debugging before retry)
 
 ---
 
@@ -705,10 +708,10 @@ bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DOCS"
 **If `status: FAILED`:**
 ```bash
 bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
-  "DESIGN QA FAILED: [paste issues[] from gss-designer JSON]"
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+  "DESIGN QA FAILED: [paste issues[] from gss-designer JSON]. Run systematic debugging before fixing."
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_DEBUGGING"
 ```
-→ Return to PHASE 4
+→ Proceed to PHASE 5.7
 
 ---
 
@@ -757,10 +760,59 @@ bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
 **If `status: NEEDS_CLARIFICATION`:**
 ```bash
 bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
-  "DOCS NEED CLARIFICATION: [open_questions]"
+  "DOCS NEED CLARIFICATION: [open_questions]. Run systematic debugging before fixing."
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_DEBUGGING"
+```
+→ Proceed to PHASE 5.7
+
+---
+
+## PHASE 5.7 — SUPERPOWERS SYSTEMATIC DEBUGGING
+
+**Trigger:** `loop_state` is `SP_DEBUGGING`
+
+Failures from functional QA, design QA, or docs do not go straight back to
+implementation. The orchestrator first dispatches a root-cause specialist so
+the next executor run fixes the cause, not the symptom.
+
+### Step 5.7.1 — Dispatch gss-debugger
+
+```
+Agent(
+  subagent_type: "gss-debugger",
+  prompt: "Investigate the latest validation failure before implementation retry.
+
+           Read:
+           - $GSD_PLAN_FILE
+           - $GSD_DECISIONS_FILE
+           - $GSD_BRAINSTORM_DOC
+           - $GSD_DESIGN_QA_REPORT if present
+           - $GSD_DOCS_REPORT if present
+           - $GSD_LOG_DIR
+           - current EXEC_PROMPT.md injected failure context
+
+           Invoke superpowers:systematic-debugging via the Skill tool and follow
+           its full workflow. Do not modify implementation code.
+           Write the compact root-cause report to
+           .planning/phases/<phase>/DEBUG_REPORT.md and inject the fix handoff
+           into EXEC_PROMPT.md using scripts/inject_answer.sh.
+           Normalize metadata with scripts/obsidian_meta.sh.
+
+           Return DEBUG JSON only."
+)
+```
+
+### Step 5.7.2 — Parse debug result
+
+**If `status: ROOT_CAUSE_FOUND`:**
+```bash
 bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 ```
-→ Return to PHASE 4 with docs clarification in context
+→ Return to PHASE 4 with DEBUG_REPORT.md context
+
+**If `status: NEEDS_MORE_EVIDENCE`:**
+Surface the requested evidence to the user or the appropriate GStack reviewer.
+Do not return to implementation until root cause is known.
 
 ---
 
@@ -811,7 +863,8 @@ bash $(cat .planning/.gss_home)/scripts/print_summary.sh
 2. **Subagent dispatch, not inline Skill invocation.** Never call the `Skill`
    tool directly on GSD/GStack/Superpowers from the orchestrator context.
    Always dispatch through a wrapper subagent (`gss-gsd-runner`, `gss-reviewer`,
-   `gss-designer`, `gss-brainstormer`, `gss-executor`, `gss-docs`) using
+   `gss-designer`, `gss-brainstormer`, `gss-executor`, `gss-docs`,
+   `gss-debugger`) using
    Agent/Task tool.
    The subagent handles Skill invocation inside its own isolated context and
    returns compact JSON.
@@ -853,8 +906,9 @@ GSD and Superpowers communicate through these files:
 | `BRAINSTORM_DOC.md` | gss-brainstormer | gss-executor (via EXEC_PROMPT) | `brainstorm` |
 | `PLAN.md` (refined) | gss-brainstormer | gss-executor | `plan` |
 | `EXEC_PROMPT.md` | write_exec_prompt.sh | gss-executor | — |
-| `DESIGN_QA.md` | gss-designer (GStack) | gss-docs, GSD dispatch | `design-qa` |
+| `DESIGN_QA.md` | gss-designer (GStack) | gss-debugger, gss-docs, GSD dispatch | `design-qa` |
 | `phases/<phase>/DEVEX_REVIEW.md` | gss-devex-reviewer (GStack) | gss-designer, gss-docs | `devex-review` |
+| `DEBUG_REPORT.md` | gss-debugger (Superpowers) | gss-executor | `debug-report` |
 | `DOCS_REPORT.md` | gss-docs (GStack) | GSD dispatch, release summary | `documentation` |
 | `bases/*.base` | scripts/obsidian_meta.sh (Step 1.5) | Obsidian vault | — |
 
@@ -918,6 +972,8 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 | `phases/<phase>/DECISIONS.md` | `decision-log` |
 | `phases/<phase>/DESIGN.md` | `design` |
 | `phases/<phase>/DESIGN_QA.md` | `design-qa` |
+| `phases/<phase>/DEVEX_REVIEW.md` | `devex-review` |
+| `phases/<phase>/DEBUG_REPORT.md` | `debug-report` |
 | `phases/<phase>/DOCS_REPORT.md` | `documentation` |
 | `phases/<phase>/BRAINSTORM_DOC.md` | `brainstorm` |
 | `phases/<phase>/EXEC_PROMPT.md` | `execution-prompt` |

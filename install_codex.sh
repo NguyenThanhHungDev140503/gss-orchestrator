@@ -174,6 +174,7 @@ dependencies:
     - document-release
     - make-pdf
     - qa
+    - systematic-debugging
     - test-driven-development
     - verification-before-completion
 policy:

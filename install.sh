@@ -21,6 +21,7 @@ REQUIRED_AGENTS=(
   gss-devex-reviewer.md
   gss-designer.md
   gss-docs.md
+  gss-debugger.md
   gss-executor.md
   gss-qa.md
   gss-brainstormer.md
