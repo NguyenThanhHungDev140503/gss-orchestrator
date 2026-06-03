@@ -14,6 +14,17 @@ RED='\033[0;31m'; CYAN='\033[0;36m'; DIM='\033[2m'; NC='\033[0m'
 SKILL_NAME="gsd-gstack-sp-orchestrator"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_SRC="$SCRIPT_DIR"
+REQUIRED_AGENTS=(
+  gss-researcher.md
+  gss-gsd-runner.md
+  gss-reviewer.md
+  gss-devex-reviewer.md
+  gss-designer.md
+  gss-docs.md
+  gss-executor.md
+  gss-qa.md
+  gss-brainstormer.md
+)
 
 # ── Parse flags ───────────────────────────────────────────────────────────
 SCOPE=""        # global | project
@@ -41,6 +52,19 @@ if [ ! -f "$SKILL_SRC/SKILL.md" ]; then
   echo "Run this script from inside the skill folder."
   exit 1
 fi
+
+if [ ! -d "$SKILL_SRC/agents" ]; then
+  echo -e "${RED}ERROR: agents/ not found at $SKILL_SRC${NC}"
+  echo "The installer needs wrapper subagents, including gss-devex-reviewer.md."
+  exit 1
+fi
+
+for required_agent in "${REQUIRED_AGENTS[@]}"; do
+  if [ ! -f "$SKILL_SRC/agents/$required_agent" ]; then
+    echo -e "${RED}ERROR: required subagent missing: $required_agent${NC}"
+    exit 1
+  fi
+done
 
 # ── Chọn scope nếu chưa truyền flag ───────────────────────────────────────
 if [ -z "$SCOPE" ]; then

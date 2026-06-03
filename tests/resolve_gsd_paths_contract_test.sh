@@ -41,6 +41,7 @@ EOF
   assert_eq "$GSD_PHASE_DIR" ".planning/phases/$phase" "GSD_PHASE_DIR"
   assert_eq "$GSD_EXEC_PROMPT" ".planning/phases/$phase/EXEC_PROMPT.md" "GSD_EXEC_PROMPT"
   assert_eq "$GSD_PLAN_FILE" ".planning/phases/$phase/01-05-PLAN.md" "GSD_PLAN_FILE"
+  assert_eq "$GSD_DEVEX_REVIEW" ".planning/phases/$phase/DEVEX_REVIEW.md" "GSD_DEVEX_REVIEW"
 )
 
 echo "resolve gsd paths contract ok"

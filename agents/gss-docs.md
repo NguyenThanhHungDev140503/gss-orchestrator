@@ -35,6 +35,7 @@ Read:
 - `$GSD_PLAN_FILE`
 - `$GSD_DECISIONS_FILE`
 - `$GSD_BRAINSTORM_DOC`
+- `$GSD_DEVEX_REVIEW` if present
 - `$GSD_PROJECT_DESIGN`, `$GSD_PHASE_DESIGN`, and `$GSD_DESIGN_QA_REPORT` if present
 - `$GSD_PHASE_DIR` logs and verification artifacts
 - changed files from git

@@ -60,6 +60,15 @@ Steps:
    cat .planning/ROADMAP.md 2>/dev/null | head -40
    ```
 5. Extract `current_phase` from STATE.md.
+6. Classify developer-facing surface: based on `.planning/REQUIREMENTS.md`,
+   `.planning/RESEARCH.md`, and the current phase `PLAN.md`, determine if the
+   project has a developer-facing surface (API, CLI, SDK, library, npm package,
+   platform, docs, Claude Code skill). Set:
+   - `devex_surface: true` if the plan exposes any interface developers
+     integrate against or that ships as a developer tool
+   - `devex_surface: false` for internal tools, pure UI apps, backend services
+     with no external API, or infrastructure-only projects
+   - `devex_rationale`: one sentence explaining the classification
 
 ### Mode: DISPATCH
 
@@ -128,7 +137,9 @@ Return ONLY one of these — no prose, no skill output, no markdown narration:
   "current_phase": "01-auth",
   "phase_count": 5,
   "roadmap_path": ".planning/ROADMAP.md",
-  "plan_path": ".planning/phases/01-auth/PLAN.md"
+  "plan_path": ".planning/phases/01-auth/PLAN.md",
+  "devex_surface": true,
+  "devex_rationale": "Project exposes a REST API and CLI for developer integration"
 }
 ```
 

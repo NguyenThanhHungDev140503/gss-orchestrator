@@ -94,6 +94,12 @@ $plan-design-review
 [the rest of the instructions]
 ```
 
+Developer experience review subagent:
+```text
+$plan-devex-review
+[the rest of the instructions]
+```
+
 Design QA subagent:
 ```text
 $design-review
@@ -133,11 +139,11 @@ Use only concrete skill ids that exist in Codex.
 ## STATE MACHINE
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
-                                  ↑                                      ↕
-                                  │                               BLOCKED:DESIGN
-                                  │                             (→ GStack routing
-                                  │                               → retry brainstorm)
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+                                  ↑                ↑                                         ↕
+                                  │         (skip if no                             BLOCKED:DESIGN
+                                  │          devex_surface)                       (→ GStack routing
+                                  │                                                 → retry brainstorm)
                                   │
                                   └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
                                                    NEXT_PHASE loop
@@ -222,6 +228,8 @@ authoritative research context for this milestone.
 Answer any AskUserQuestion gates using the requirements when possible.
 When finished, output only:
 PLANNING_DONE: [current milestone name]
+DEVEX_SURFACE: true or false
+DEVEX_RATIONALE: [one sentence]
 ```
 
 After subagent outputs `PLANNING_DONE`:
@@ -229,7 +237,8 @@ After subagent outputs `PLANNING_DONE`:
 cat .planning/STATE.md
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>"
+DEVEX_SURFACE="<true-or-false-from-planning-output>"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>" "$DEVEX_SURFACE"
 ```
 
 Research stays in the single file `.planning/RESEARCH.md` (compatible mode); it
@@ -298,10 +307,80 @@ After `ENG_DONE`:
 bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "eng-review" "[extracted numbered decisions]"
 
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+DEVEX=$(jq -r '.devex_surface // false' .planning/GSS_STATE.json)
+if [ "$DEVEX" = "true" ]; then
+  bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DX_REVIEW"
+else
+  bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+fi
 
 bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
+
+---
+
+## PHASE 2.3 — GSTACK_DX_REVIEW
+
+**Trigger:** `loop_state` is `GSTACK_DX_REVIEW`
+
+Skip path:
+```bash
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
+DEVEX=$(jq -r '.devex_surface // false' .planning/GSS_STATE.json)
+if [ "$DEVEX" != "true" ]; then
+  echo "No developer-facing surface detected — skipping DX review"
+  bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+fi
+```
+
+If `DEVEX=true`, spawn one DX review subagent. Its **initial message must begin with**:
+```text
+$plan-devex-review
+Review this milestone plan for developer experience gaps: getting-started
+friction, API/CLI ergonomics, error messages, integration docs, and TTHW.
+
+Read:
+- PLAN.md
+- DECISIONS.md
+- REQUIREMENTS.md
+- RESEARCH.md
+- shared_context.md
+
+devex_rationale: [paste DEVEX_RATIONALE from planning output if available]
+
+Write compact DX findings to .planning/phases/<phase>/DEVEX_REVIEW.md.
+Use scripts/obsidian_meta.sh to normalize metadata; do not hand-write YAML.
+
+Return only:
+DX_DECISIONS_START
+1. ...
+2. ...
+DX_DECISIONS_END
+DX_GAPS: [list]
+TTHW_ESTIMATE: [estimate or unknown]
+DX_STATUS: APPROVED or NEEDS_CLARIFICATION
+DX_DONE
+```
+
+After `DX_DONE`:
+
+**If `DX_STATUS: APPROVED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
+  "dx-review" "[extracted numbered DX decisions]"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
+```
+→ PHASE 2.5
+
+**If `DX_STATUS: NEEDS_CLARIFICATION`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DX REVIEW NEEDS CLARIFICATION: [open questions]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW"
+```
+→ Return to PHASE 2 with DX clarification in context
 
 ---
 
@@ -320,6 +399,9 @@ Plan to review:
 
 Existing decisions:
 [paste logged CEO/engineering decisions]
+
+Developer experience review:
+[paste DEVEX_REVIEW.md if present]
 
 Use $design-consultation if no design direction exists.
 Use $design-shotgun if multiple visual directions are needed.
@@ -590,6 +672,7 @@ Read:
 - PLAN.md
 - DECISIONS.md
 - BRAINSTORM_DOC.md
+- DEVEX_REVIEW.md if present
 - DESIGN_QA.md
 - changed files from git
 
@@ -696,6 +779,7 @@ bash $(cat .planning/.gss_home)/scripts/checkpoint.sh --phase
 | `PLAN.md` (draft) | Planning subagent (GSD) | Brainstorming gate subagent |
 | `DECISIONS.md` | Review subagents (GStack) | Brainstorming gate, executor |
 | `DESIGN.md` | Design subagent (GStack) | Brainstorming gate, executor, docs subagent |
+| `DEVEX_REVIEW.md` | DX review subagent (GStack) | Design subagent, docs subagent |
 | `BRAINSTORM_DOC.md` | Brainstorming gate subagent | Executor (via EXEC_PROMPT) |
 | `PLAN.md` (refined) | Brainstorming gate subagent | Executor |
 | `EXEC_PROMPT.md` | write_exec_prompt_codex.sh | Executor subagent |
@@ -766,6 +850,7 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 | `phases/<phase>/DECISIONS.md` | `decision-log` |
 | `phases/<phase>/DESIGN.md` | `design` |
 | `phases/<phase>/DESIGN_QA.md` | `design-qa` |
+| `phases/<phase>/DEVEX_REVIEW.md` | `devex-review` |
 | `phases/<phase>/DOCS_REPORT.md` | `documentation` |
 | `phases/<phase>/BRAINSTORM_DOC.md` | `brainstorm` |
 | `phases/<phase>/EXEC_PROMPT.md` | `execution-prompt` |

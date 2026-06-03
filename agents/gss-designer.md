@@ -34,6 +34,7 @@ mkdir -p "$GSD_LOG_DIR"
 Read current phase context:
 - `$GSD_PLAN_FILE`
 - `$GSD_DECISIONS_FILE`
+- `$GSD_DEVEX_REVIEW` if present
 - `$GSD_BRAINSTORM_DOC` if present
 - `.planning/RESEARCH.md`
 - `.planning/shared_context.md`

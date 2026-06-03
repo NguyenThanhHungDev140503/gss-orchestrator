@@ -75,10 +75,10 @@ Giải pháp của GSS Orchestrator dựa trên 4 nguyên tắc:
 Trạng thái lưu tại `.planning/GSS_STATE.json` và được đọc đầu mỗi turn:
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
-                                        ↕                                      ↕
-                                  GStack routing                         GStack routing
-                                  cho blocking Qs                         cho design Qs
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+                                        ↕                ↕                                      ↕
+                                  GStack routing   skip if no devex_surface               GStack routing
+                                  cho blocking Qs                                          cho design Qs
                                   └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
 ```
 
@@ -88,6 +88,7 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_B
 | `RESEARCH` | User gửi requirements | `gss-researcher` |
 | `PLANNING` | RESEARCH.md đã tạo | `gss-gsd-runner` (mode `PLANNING`) |
 | `GSTACK_REVIEW` | PLAN.md đã có | `gss-reviewer` ×2 (CEO → Engineering) |
+| `GSTACK_DX_REVIEW` | `devex_surface=true` sau CEO/Engineering review | `gss-devex-reviewer` |
 | `GSTACK_DESIGN_PLAN` | CEO/Engineering decisions đã có | `gss-designer` (mode `DESIGN_PLAN`) |
 | `SP_BRAINSTORM` | GStack review đã có decisions | `gss-brainstormer` |
 | `SP_EXECUTING` | EXEC_PROMPT.md đã ghi | `gss-executor` (qua Task tool) |
@@ -106,6 +107,7 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_B
 | 0 — RESEARCH | `gss-researcher` | (không có — dùng `WebSearch`/`WebFetch` trực tiếp) | — |
 | 1 — PLANNING | `gss-gsd-runner` | `gsd-new-project` hoặc `gsd-plan-phase` | GSD |
 | 2 — GSTACK_REVIEW | `gss-reviewer` | `plan-ceo-review`, rồi `plan-eng-review` | GStack |
+| 2.3 — GSTACK_DX_REVIEW | `gss-devex-reviewer` | `plan-devex-review` | GStack |
 | 2.5 — GSTACK_DESIGN_PLAN | `gss-designer` | `plan-design-review`, optional `design-consultation` / `design-shotgun` / `design-html` | GStack |
 | 3 — SP_BRAINSTORM | `gss-brainstormer` | `brainstorming`, `writing-plans` | Superpowers |
 | 4 — SP_EXECUTING | `gss-executor` | `superpowers:test-driven-development` | Superpowers |
@@ -255,7 +257,7 @@ bash install_hermes.sh
 Installer sẽ:
 
 1. Copy `SKILL.md`, `scripts/`, `references/`, `agents/` vào `~/.claude/skills/gsd-gstack-sp-orchestrator/` (hoặc `.claude/skills/...` cho project scope).
-2. Deploy 5 subagent (`gss-*.md`) vào `~/.claude/agents/` hoặc `.claude/agents/`.
+2. Deploy các subagent (`gss-*.md`) vào `~/.claude/agents/` hoặc `.claude/agents/`.
 3. Append GSS authority block vào `CLAUDE.md` của project.
 
 ### Sau khi cài
@@ -287,10 +289,11 @@ gsd-gstack-sp-orchestrator/
 ├── install.sh                  # Standard installer
 ├── install_codex.sh            # Codex installer
 ├── install_hermes.sh           # Hermes installer
-├── agents/                     # 5 wrapper subagents
+├── agents/                     # Wrapper subagents
 │   ├── gss-researcher.md       #   Phase 0 — web research
 │   ├── gss-gsd-runner.md       #   Phase 1, 6 — GSD wrapper
 │   ├── gss-reviewer.md         #   Phase 2, 3b, 5 — GStack wrapper
+│   ├── gss-devex-reviewer.md   #   Phase 2.3 — GStack DX wrapper
 │   ├── gss-designer.md         #   Phase 2.5, 5.5 — GStack design wrapper
 │   ├── gss-docs.md             #   Phase 5.6 — GStack docs wrapper
 │   ├── gss-executor.md         #   Phase 3 — Superpowers TDD
@@ -344,6 +347,7 @@ gsd-gstack-sp-orchestrator/
     ├── PLAN.md                 # GSD output cho phase này
     ├── STATE.md                # Phase state
     ├── DESIGN.md               # Phase design notes from GStack Designer
+    ├── DEVEX_REVIEW.md         # Pre-build developer experience review
     ├── EXEC_PROMPT.md          # Build từ PLAN.md cho Superpowers
     ├── DESIGN_QA.md            # Post-build design-review report
     ├── DOCS_REPORT.md          # document-release/doc generation report

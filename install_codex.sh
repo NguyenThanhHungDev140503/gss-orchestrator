@@ -164,6 +164,7 @@ dependencies:
     - gsd-progress
     - plan-ceo-review
     - plan-eng-review
+    - plan-devex-review
     - plan-design-review
     - design-review
     - design-consultation

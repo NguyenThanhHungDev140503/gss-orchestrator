@@ -64,11 +64,11 @@ cat .planning/GSS_STATE.json 2>/dev/null || echo '{"loop_state":"IDLE"}'
 ```
 
 ```
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
-                                  ↑                                      ↕
-                                  │                               BLOCKED:DESIGN
-                                  │                             (→ gss-reviewer
-                                  │                               → back to BRAINSTORM)
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+                                  ↑                ↑                                         ↕
+                                  │         (skip if no                             BLOCKED:DESIGN
+                                  │          devex_surface)                       (→ gss-reviewer
+                                  │                                                 → back to BRAINSTORM)
                                   │
                                   └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
                                                    NEXT_PHASE loop
@@ -214,7 +214,8 @@ If `.planning/` was not created → re-invoke, do not proceed.
 ### Step 1.4 — Update state
 
 ```bash
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>"
+DEVEX_SURFACE=$(echo '<planning_json_result>' | jq -r '.devex_surface // false')
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>" "$DEVEX_SURFACE"
 ```
 
 ### Step 1.5 — Generate Obsidian Bases query files
@@ -305,18 +306,91 @@ Agent(
 )
 ```
 
-### Step 2.4 — Advance to design plan review
+### Step 2.4 — Advance to DX or design plan review
 
 ```bash
 bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "eng-review" "[extracted engineering decisions]"
 
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+DEVEX=$(jq -r '.devex_surface // false' .planning/GSS_STATE.json)
+if [ "$DEVEX" = "true" ]; then
+  bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DX_REVIEW"
+else
+  bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+fi
 
 bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 
-**→ Proceed to PHASE 2.5**
+**→ Proceed to PHASE 2.3 or PHASE 2.5**
+
+---
+
+## PHASE 2.3 — GSTACK_DX_REVIEW
+
+**Trigger:** `loop_state` is `GSTACK_DX_REVIEW`
+
+### Step 2.3.1 — Conditional skip check
+
+```bash
+source $(cat .planning/.gss_home)/scripts/resolve_gsd_paths.sh
+DEVEX=$(jq -r '.devex_surface // false' .planning/GSS_STATE.json)
+if [ "$DEVEX" != "true" ]; then
+  echo "No developer-facing surface detected — skipping DX review"
+  bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+fi
+```
+
+If `DEVEX` is not `true`, skip to PHASE 2.5 immediately.
+
+### Step 2.3.2 — Dispatch gss-devex-reviewer
+
+Use **Agent/Task tool**:
+
+```
+Agent(
+  subagent_type: "gss-devex-reviewer",
+  prompt: "Mode: DEVEX_REVIEW
+
+           Review the current milestone plan for developer experience gaps.
+
+           Read:
+           - $GSD_PLAN_FILE
+           - $GSD_DECISIONS_FILE
+           - .planning/REQUIREMENTS.md
+           - .planning/RESEARCH.md
+           - .planning/shared_context.md
+
+           devex_rationale: [paste devex_rationale from PLANNING_COMPLETE JSON if available]
+
+           Invoke plan-devex-review via the Skill tool and follow its full
+           workflow. Write compact DX findings to $GSD_DEVEX_REVIEW.
+           Normalize metadata with scripts/obsidian_meta.sh.
+           Return DEVEX_REVIEW JSON only."
+)
+```
+
+Wait for JSON.
+
+### Step 2.3.3 — Parse result
+
+**If `status: APPROVED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
+  "dx-review" "[extracted DX decisions]"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
+```
+→ Proceed to PHASE 2.5
+
+**If `status: NEEDS_CLARIFICATION`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DX REVIEW NEEDS CLARIFICATION: [open_questions]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW"
+```
+→ Return to PHASE 2 with DX question in context
 
 ---
 
@@ -342,6 +416,7 @@ Agent(
            Read:
            - $GSD_PLAN_FILE
            - $GSD_DECISIONS_FILE
+           - $GSD_DEVEX_REVIEW if present
            - .planning/RESEARCH.md
            - .planning/shared_context.md
            - .planning/DESIGN.md if present
@@ -772,6 +847,7 @@ GSD and Superpowers communicate through these files:
 | `PLAN.md` (refined) | gss-brainstormer | gss-executor | `plan` |
 | `EXEC_PROMPT.md` | write_exec_prompt.sh | gss-executor | — |
 | `DESIGN_QA.md` | gss-designer (GStack) | gss-docs, GSD dispatch | `design-qa` |
+| `phases/<phase>/DEVEX_REVIEW.md` | gss-devex-reviewer (GStack) | gss-designer, gss-docs | `devex-review` |
 | `DOCS_REPORT.md` | gss-docs (GStack) | GSD dispatch, release summary | `documentation` |
 | `bases/*.base` | scripts/obsidian_meta.sh (Step 1.5) | Obsidian vault | — |
 
