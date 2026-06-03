@@ -75,10 +75,11 @@ Giải pháp của GSS Orchestrator dựa trên 4 nguyên tắc:
 Trạng thái lưu tại `.planning/GSS_STATE.json` và được đọc đầu mỗi turn:
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
-                                        ↕
-                                  GStack routing cho blocking Qs
-                                  rồi quay lại SP_EXECUTING
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+                                        ↕                                      ↕
+                                  GStack routing                         GStack routing
+                                  cho blocking Qs                         cho design Qs
+                                  └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
 ```
 
 | State | Trigger | Subagent dispatch |
@@ -87,10 +88,13 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUT
 | `RESEARCH` | User gửi requirements | `gss-researcher` |
 | `PLANNING` | RESEARCH.md đã tạo | `gss-gsd-runner` (mode `PLANNING`) |
 | `GSTACK_REVIEW` | PLAN.md đã có | `gss-reviewer` ×2 (CEO → Engineering) |
+| `GSTACK_DESIGN_PLAN` | CEO/Engineering decisions đã có | `gss-designer` (mode `DESIGN_PLAN`) |
 | `SP_BRAINSTORM` | GStack review đã có decisions | `gss-brainstormer` |
 | `SP_EXECUTING` | EXEC_PROMPT.md đã ghi | `gss-executor` (qua Task tool) |
 | `GSTACK_QA` | Phase báo `PHASE_COMPLETE` | `gss-reviewer` (Review type `QA`) |
-| `GSD_DISPATCH` | QA pass | `gss-gsd-runner` (mode `DISPATCH`) |
+| `GSTACK_DESIGN_QA` | Functional QA pass | `gss-designer` (mode `DESIGN_QA`) |
+| `GSTACK_DOCS` | Functional + design QA pass | `gss-docs` |
+| `GSD_DISPATCH` | QA + design + docs pass | `gss-gsd-runner` (mode `DISPATCH`) |
 | `DELIVERED` | Hết phase trong roadmap | (in summary, kết thúc) |
 
 ---
@@ -102,10 +106,13 @@ IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUT
 | 0 — RESEARCH | `gss-researcher` | (không có — dùng `WebSearch`/`WebFetch` trực tiếp) | — |
 | 1 — PLANNING | `gss-gsd-runner` | `gsd-new-project` hoặc `gsd-plan-phase` | GSD |
 | 2 — GSTACK_REVIEW | `gss-reviewer` | `plan-ceo-review`, rồi `plan-eng-review` | GStack |
+| 2.5 — GSTACK_DESIGN_PLAN | `gss-designer` | `plan-design-review`, optional `design-consultation` / `design-shotgun` / `design-html` | GStack |
 | 3 — SP_BRAINSTORM | `gss-brainstormer` | `brainstorming`, `writing-plans` | Superpowers |
 | 4 — SP_EXECUTING | `gss-executor` | `superpowers:test-driven-development` | Superpowers |
 | 4b — Blocked Q | `gss-reviewer` | `plan-ceo-review` / `plan-eng-review` / `qa` (theo router) | GStack |
 | 5 — GSTACK_QA | `gss-reviewer` | `gstack:qa` / `qa` | GStack |
+| 5.5 — GSTACK_DESIGN_QA | `gss-designer` | `design-review` | GStack |
+| 5.6 — GSTACK_DOCS | `gss-docs` | `document-release`, optional `document-generate` / `make-pdf` | GStack |
 | 6 — GSD_DISPATCH | `gss-gsd-runner` | `gsd-plan-phase` (cho phase tiếp theo) | GSD |
 
 **Lưu ý:** `gss-researcher` cố ý KHÔNG có `Skill` tool vì nó chỉ tạo research context. QA cuối milestone phải đi qua GStack QA role bằng `gss-reviewer`; test runner cục bộ chỉ là bằng chứng đầu vào, không phải QA authority.
@@ -282,8 +289,10 @@ gsd-gstack-sp-orchestrator/
 ├── install_hermes.sh           # Hermes installer
 ├── agents/                     # 5 wrapper subagents
 │   ├── gss-researcher.md       #   Phase 0 — web research
-│   ├── gss-gsd-runner.md       #   Phase 1, 5 — GSD wrapper
+│   ├── gss-gsd-runner.md       #   Phase 1, 6 — GSD wrapper
 │   ├── gss-reviewer.md         #   Phase 2, 3b, 5 — GStack wrapper
+│   ├── gss-designer.md         #   Phase 2.5, 5.5 — GStack design wrapper
+│   ├── gss-docs.md             #   Phase 5.6 — GStack docs wrapper
 │   ├── gss-executor.md         #   Phase 3 — Superpowers TDD
 │   └── gss-qa.md               #   Fallback/local QA evidence collector
 ├── scripts/                    # 15 deterministic helpers
@@ -323,6 +332,7 @@ gsd-gstack-sp-orchestrator/
 ├── RESEARCH.md                 # Phase 0 output (research source of truth)
 ├── ROADMAP.md                  # Phase 1 output (GSD)
 ├── DECISIONS.md                # Append-only audit log
+├── DESIGN.md                   # Project-wide design direction, if needed
 ├── shared_context.md           # Cross-phase context
 ├── config.json                 # Loop config (max iterations, ...)
 ├── bases/                      # Obsidian Bases query files
@@ -333,7 +343,10 @@ gsd-gstack-sp-orchestrator/
 └── phases/<phase-id>/
     ├── PLAN.md                 # GSD output cho phase này
     ├── STATE.md                # Phase state
+    ├── DESIGN.md               # Phase design notes from GStack Designer
     ├── EXEC_PROMPT.md          # Build từ PLAN.md cho Superpowers
+    ├── DESIGN_QA.md            # Post-build design-review report
+    ├── DOCS_REPORT.md          # document-release/doc generation report
     ├── OPEN_QUESTIONS.md       # Blocked questions (Phase 3b)
     └── logs/                   # Full GStack/QA transcripts
 ```

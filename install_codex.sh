@@ -164,6 +164,14 @@ dependencies:
     - gsd-progress
     - plan-ceo-review
     - plan-eng-review
+    - plan-design-review
+    - design-review
+    - design-consultation
+    - design-shotgun
+    - design-html
+    - document-generate
+    - document-release
+    - make-pdf
     - qa
     - test-driven-development
     - verification-before-completion

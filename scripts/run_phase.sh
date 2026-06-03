@@ -78,7 +78,7 @@ if check_implicit_done; then
   ITER=0; write_artifacts
   echo '{"status":"DONE","note":"recovered"}' > "$RESULT_FILE"
   bash "$SCRIPT_DIR/update_state.sh" "GSTACK_QA"
-  echo -e "${GREEN}✅ Done${NC}"; echo "Next: /gstack:qa then QA skill"; exit 0
+  echo -e "${GREEN}✅ Done${NC}"; echo "Next: GStack QA, then design QA, then docs"; exit 0
 fi
 
 ITER=0; RESULT="UNKNOWN"
@@ -120,7 +120,7 @@ case "$RESULT" in
     echo '{"status":"DONE"}' > "$RESULT_FILE"
     bash "$SCRIPT_DIR/update_state.sh" "GSTACK_QA"
     echo -e "${GREEN}✅ Phase complete — $ITER iter(s)${NC}"
-    echo "Next: /gstack:qa then QA skill"
+    echo "Next: GStack QA, then design QA, then docs"
     exit 0 ;;
   "BLOCKED"|"BLOCKED_TECH")
     Q=$(cat "$GSD_BLOCKED_FILE" 2>/dev/null)

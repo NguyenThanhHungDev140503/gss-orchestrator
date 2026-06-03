@@ -83,7 +83,7 @@ elif [ -f "$GSD_BLOCKED_FILE" ]; then
   Q=$(cat "$GSD_BLOCKED_FILE" 2>/dev/null | head -1)
   RESUMPTION_HINT="BLOCKED waiting for GStack decision: $Q. Run: bash scripts/route_question.sh"
 else
-  RESUMPTION_HINT="Phase $CURRENT_PHASE complete. Run GStack QA via gss-reviewer, then /gsd-complete-milestone"
+  RESUMPTION_HINT="Phase $CURRENT_PHASE complete. Run GStack QA, design QA, docs, then GSD dispatch"
 fi
 
 # ── 4. Append vào checkpoint history ──────────────────────────────────────

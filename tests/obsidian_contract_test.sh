@@ -20,6 +20,15 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local file="$1"
+  local pattern="$2"
+  if grep -Fq -- "$pattern" "$file"; then
+    echo "Expected '$file' to not contain: $pattern" >&2
+    exit 1
+  fi
+}
+
 assert_frontmatter_type() {
   local file="$1"
   local type="$2"
@@ -77,6 +86,22 @@ EOF
 cat > "$tmpdir/.planning/phases/01-demo/BRAINSTORM_DOC.md" <<'EOF'
 # Brainstorm
 EOF
+cat > "$tmpdir/.planning/DESIGN.md" <<'EOF'
+# Project Design
+Use the existing visual system.
+EOF
+cat > "$tmpdir/.planning/phases/01-demo/DESIGN.md" <<'EOF'
+# Phase Design
+Use a compact review layout.
+EOF
+cat > "$tmpdir/.planning/phases/01-demo/DESIGN_QA.md" <<'EOF'
+# Design QA
+Visual review passed.
+EOF
+cat > "$tmpdir/.planning/phases/01-demo/DOCS_REPORT.md" <<'EOF'
+# Docs Report
+Release docs updated.
+EOF
 
 (
   cd "$tmpdir"
@@ -101,6 +126,11 @@ assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/PLAN.md" "plan"
 assert_contains "$tmpdir/.planning/phases/01-demo/PLAN.md" "phase: 01-demo"
 assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DECISIONS.md" "decision-log"
 assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/BRAINSTORM_DOC.md" "brainstorm"
+assert_frontmatter_type "$tmpdir/.planning/DESIGN.md" "design"
+assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DESIGN.md" "design"
+assert_contains "$tmpdir/.planning/phases/01-demo/DESIGN.md" "phase: 01-demo"
+assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DESIGN_QA.md" "design-qa"
+assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DOCS_REPORT.md" "documentation"
 
 assert_file_exists "$tmpdir/.planning/bases/project-dashboard.base"
 assert_file_exists "$tmpdir/.planning/bases/phases.base"
@@ -143,15 +173,14 @@ assert_contains "$ROOT/agents/gss-researcher.md" "obsidian_meta.sh"
 assert_contains "$ROOT/agents/gss-gsd-runner.md" "normalize-known"
 assert_contains "$ROOT/agents/gss-reviewer.md" "ensure-frontmatter"
 assert_contains "$ROOT/agents/gss-brainstormer.md" "normalize-known"
-
-assert_not_contains() {
-  local file="$1"
-  local pattern="$2"
-  if grep -Fq -- "$pattern" "$file"; then
-    echo "Expected '$file' to not contain: $pattern" >&2
-    exit 1
-  fi
-}
+assert_contains "$ROOT/agents/gss-designer.md" "obsidian_meta.sh"
+assert_contains "$ROOT/agents/gss-designer.md" "ensure-frontmatter"
+assert_contains "$ROOT/agents/gss-docs.md" "obsidian_meta.sh"
+assert_contains "$ROOT/agents/gss-docs.md" "ensure-frontmatter"
+assert_not_contains "$ROOT/agents/gss-designer.md" ".claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh"
+assert_not_contains "$ROOT/agents/gss-docs.md" ".claude/skills/gsd-gstack-sp-orchestrator/scripts/obsidian_meta.sh"
+assert_not_contains "$ROOT/agents/gss-designer.md" "write frontmatter manually"
+assert_not_contains "$ROOT/agents/gss-docs.md" "write frontmatter manually"
 
 assert_contains "$ROOT/SKILL.md" "scripts/obsidian_meta.sh"
 assert_contains "$ROOT/SKILL.md" ".planning/RESEARCH.md"
@@ -162,6 +191,8 @@ assert_not_contains "$ROOT/SKILL.md" "research/FEATURES.md"
 assert_not_contains "$ROOT/SKILL.md" "research/ARCHITECTURE.md"
 assert_not_contains "$ROOT/SKILL.md" "research/PITFALLS.md"
 assert_contains "$ROOT/SKILL.codex.md" "obsidian_meta.sh"
+assert_contains "$ROOT/SKILL.codex.md" 'phases/<phase>/DESIGN_QA.md'
+assert_contains "$ROOT/SKILL.codex.md" 'phases/<phase>/DOCS_REPORT.md'
 assert_contains "$ROOT/README.md" ".planning/.project_slug"
 assert_contains "$ROOT/README.md" ".planning/bases/"
 assert_contains "$ROOT/README.md" ".planning/RESEARCH.md"

@@ -139,6 +139,30 @@ EOF
       echo 'plan: "[[PLAN]]"'
       echo 'decisions: "[[DECISIONS]]"'
       ;;
+    design)
+      if [ -n "$phase" ]; then
+        echo 'plan: "[[PLAN]]"'
+        echo 'decisions: "[[DECISIONS]]"'
+      else
+        echo 'related:'
+        echo '  - "[[PROJECT]]"'
+        echo '  - "[[ROADMAP]]"'
+      fi
+      ;;
+    design-qa)
+      echo 'plan: "[[PLAN]]"'
+      echo 'decisions: "[[DECISIONS]]"'
+      echo 'design: "[[DESIGN]]"'
+      ;;
+    documentation)
+      if [ -n "$phase" ]; then
+        echo 'plan: "[[PLAN]]"'
+        echo 'decisions: "[[DECISIONS]]"'
+      else
+        echo 'related:'
+        echo '  - "[[PROJECT]]"'
+      fi
+      ;;
     roadmap)
       echo 'related:'
       echo '  - "[[REQUIREMENTS]]"'
@@ -228,6 +252,7 @@ normalize_known() {
   ensure_frontmatter "$PLANNING_DIR/PROJECT.md" project
   ensure_frontmatter "$PLANNING_DIR/ROADMAP.md" roadmap
   ensure_frontmatter "$PLANNING_DIR/DECISIONS.md" decision-log
+  ensure_frontmatter "$PLANNING_DIR/DESIGN.md" design
   ensure_frontmatter "$PLANNING_DIR/shared_context.md" shared-context
   ensure_frontmatter "$PLANNING_DIR/CHECKPOINT_HISTORY.md" checkpoint-log
 
@@ -237,6 +262,9 @@ normalize_known() {
     phase="$(basename "$phase_dir")"
     ensure_frontmatter "$phase_dir/PLAN.md" plan "$phase"
     ensure_frontmatter "$phase_dir/DECISIONS.md" decision-log "$phase"
+    ensure_frontmatter "$phase_dir/DESIGN.md" design "$phase"
+    ensure_frontmatter "$phase_dir/DESIGN_QA.md" design-qa "$phase"
+    ensure_frontmatter "$phase_dir/DOCS_REPORT.md" documentation "$phase"
     ensure_frontmatter "$phase_dir/BRAINSTORM_DOC.md" brainstorm "$phase"
     ensure_frontmatter "$phase_dir/EXEC_PROMPT.md" execution-prompt "$phase"
   done

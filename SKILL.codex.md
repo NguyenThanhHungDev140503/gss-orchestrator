@@ -88,6 +88,24 @@ $plan-eng-review
 [the rest of the instructions]
 ```
 
+Design plan review subagent:
+```text
+$plan-design-review
+[the rest of the instructions]
+```
+
+Design QA subagent:
+```text
+$design-review
+[the rest of the instructions]
+```
+
+Documentation subagent:
+```text
+$document-release
+[the rest of the instructions]
+```
+
 QA review subagent:
 ```text
 $qa
@@ -115,13 +133,14 @@ Use only concrete skill ids that exist in Codex.
 ## STATE MACHINE
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
-                                  ↑                 ↕                                          │
-                                  │          BLOCKED:DESIGN                                    │
-                                  │        (→ GStack routing                                   │
-                                  │          → retry brainstorm)                               │
-                                  └────────────────────────────────────────────────────────────┘
-                                                  NEXT_PHASE loop
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+                                  ↑                                      ↕
+                                  │                               BLOCKED:DESIGN
+                                  │                             (→ GStack routing
+                                  │                               → retry brainstorm)
+                                  │
+                                  └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
+                                                   NEXT_PHASE loop
 ```
 
 ---
@@ -279,10 +298,64 @@ After `ENG_DONE`:
 bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "eng-review" "[extracted numbered decisions]"
 
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_BRAINSTORM"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
 
 bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
+
+---
+
+## PHASE 2.5 — GSTACK DESIGN PLAN REVIEW
+
+**Trigger:** `loop_state` is `GSTACK_DESIGN_PLAN`
+
+Spawn one design subagent. Its **initial message must begin with**:
+```text
+$plan-design-review
+Review this milestone plan for UI/UX, interaction design, visual hierarchy,
+accessibility, product-design risk, and fit with existing design direction.
+
+Plan to review:
+[paste plan content]
+
+Existing decisions:
+[paste logged CEO/engineering decisions]
+
+Use $design-consultation if no design direction exists.
+Use $design-shotgun if multiple visual directions are needed.
+Use $design-html if a concrete HTML design artifact is required.
+
+Write compact design notes to .planning/phases/<phase>/DESIGN.md when needed.
+Use scripts/obsidian_meta.sh to normalize metadata; do not hand-write YAML.
+
+Return only:
+DESIGN_DECISIONS_START
+1. ...
+2. ...
+DESIGN_DECISIONS_END
+DESIGN_PLAN_STATUS: APPROVED or NEEDS_CLARIFICATION
+DESIGN_PLAN_DONE
+```
+
+After `DESIGN_PLAN_DONE`:
+
+**If `DESIGN_PLAN_STATUS: APPROVED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
+  "design-plan" "[extracted numbered design decisions]"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_BRAINSTORM"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
+```
+→ PHASE 3
+
+**If `DESIGN_PLAN_STATUS: NEEDS_CLARIFICATION`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DESIGN PLAN NEEDS CLARIFICATION: [open questions]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW"
+```
+→ Return to PHASE 2 with design clarification in context
 
 ---
 
@@ -446,9 +519,9 @@ After `QA_DONE`:
 
 **If `QA_STATUS: PASSED`:**
 ```bash
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_QA"
 ```
-→ PHASE 6
+→ PHASE 5.5
 
 **If `QA_STATUS: FAILED`:**
 ```bash
@@ -456,6 +529,100 @@ bash $(cat .planning/.gss_home)/scripts/inject_answer.sh "QA FAILED: [issues]"
 bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 ```
 → Re-spawn execution subagent
+
+---
+
+## PHASE 5.5 — GSTACK DESIGN QA
+
+**Trigger:** `loop_state` is `GSTACK_DESIGN_QA`
+
+Spawn one design QA subagent. Its **initial message must begin with**:
+```text
+$design-review
+Run post-implementation visual/design QA for this completed milestone.
+
+Read:
+- PLAN.md
+- DECISIONS.md
+- BRAINSTORM_DOC.md
+- .planning/DESIGN.md and .planning/phases/<phase>/DESIGN.md if present
+- implementation artifacts and relevant screenshots/test evidence
+
+Write the compact report to .planning/phases/<phase>/DESIGN_QA.md.
+Use scripts/obsidian_meta.sh to normalize metadata; do not hand-write YAML.
+
+Return only:
+DESIGN_QA_STATUS: PASSED or FAILED or SKIPPED
+ISSUES: [list issues if failed, or "none"]
+DESIGN_QA_DONE
+```
+
+After `DESIGN_QA_DONE`:
+
+**If `DESIGN_QA_STATUS: PASSED` or `SKIPPED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DOCS"
+```
+→ PHASE 5.6
+
+**If `DESIGN_QA_STATUS: FAILED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DESIGN QA FAILED: [issues]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+```
+→ Re-spawn execution subagent
+
+---
+
+## PHASE 5.6 — GSTACK DOCUMENTATION
+
+**Trigger:** `loop_state` is `GSTACK_DOCS`
+
+Spawn one documentation subagent. Its **initial message must begin with**:
+```text
+$document-release
+Update release documentation for the completed milestone after functional QA and
+design QA have passed.
+
+Read:
+- PLAN.md
+- DECISIONS.md
+- BRAINSTORM_DOC.md
+- DESIGN_QA.md
+- changed files from git
+
+Use $document-generate only for missing feature/module/user docs.
+Use $make-pdf only when this milestone explicitly requires a PDF.
+
+Write the compact report to .planning/phases/<phase>/DOCS_REPORT.md.
+Use scripts/obsidian_meta.sh to normalize metadata; do not hand-write YAML.
+
+Return only:
+DOCS_STATUS: DOCS_DONE or NEEDS_CLARIFICATION
+DOCS_UPDATED: [list]
+DOCS_CREATED: [list]
+DOCS_DONE
+```
+
+After `DOCS_DONE`:
+
+**If `DOCS_STATUS: DOCS_DONE`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
+```
+→ PHASE 6
+
+**If `DOCS_STATUS: NEEDS_CLARIFICATION`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DOCS NEED CLARIFICATION: [open questions]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+```
+→ Re-spawn execution subagent with docs clarification in context
 
 ---
 
@@ -528,9 +695,12 @@ bash $(cat .planning/.gss_home)/scripts/checkpoint.sh --phase
 | `ROADMAP.md` | Planning subagent (GSD) | Orchestrator, review subagents |
 | `PLAN.md` (draft) | Planning subagent (GSD) | Brainstorming gate subagent |
 | `DECISIONS.md` | Review subagents (GStack) | Brainstorming gate, executor |
+| `DESIGN.md` | Design subagent (GStack) | Brainstorming gate, executor, docs subagent |
 | `BRAINSTORM_DOC.md` | Brainstorming gate subagent | Executor (via EXEC_PROMPT) |
 | `PLAN.md` (refined) | Brainstorming gate subagent | Executor |
 | `EXEC_PROMPT.md` | write_exec_prompt_codex.sh | Executor subagent |
+| `DESIGN_QA.md` | Design subagent (GStack) | Docs subagent, dispatch summary |
+| `DOCS_REPORT.md` | Docs subagent (GStack) | Dispatch summary |
 
 ---
 
@@ -589,10 +759,14 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 | `PROJECT.md` | `project` |
 | `ROADMAP.md` | `roadmap` |
 | `DECISIONS.md` | `decision-log` |
+| `DESIGN.md` | `design` |
 | `shared_context.md` | `shared-context` |
 | `CHECKPOINT_HISTORY.md` | `checkpoint-log` |
 | `phases/<phase>/PLAN.md` | `plan` |
 | `phases/<phase>/DECISIONS.md` | `decision-log` |
+| `phases/<phase>/DESIGN.md` | `design` |
+| `phases/<phase>/DESIGN_QA.md` | `design-qa` |
+| `phases/<phase>/DOCS_REPORT.md` | `documentation` |
 | `phases/<phase>/BRAINSTORM_DOC.md` | `brainstorm` |
 | `phases/<phase>/EXEC_PROMPT.md` | `execution-prompt` |
 

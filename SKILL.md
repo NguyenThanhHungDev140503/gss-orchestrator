@@ -64,12 +64,13 @@ cat .planning/GSS_STATE.json 2>/dev/null || echo '{"loop_state":"IDLE"}'
 ```
 
 ```
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → SP_BRAINSTORM → SP_EXECUTING → GSTACK_QA → GSD_DISPATCH
-                                  ↑                  ↕                                         │
-                                  │           BLOCKED:DESIGN                                   │
-                                  │         (→ gss-reviewer                                    │
-                                  │           → back to BRAINSTORM)                            │
-                                  └────────────────────────────────────────────────────────────┘
+IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+                                  ↑                                      ↕
+                                  │                               BLOCKED:DESIGN
+                                  │                             (→ gss-reviewer
+                                  │                               → back to BRAINSTORM)
+                                  │
+                                  └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
                                                    NEXT_PHASE loop
 ```
 
@@ -266,22 +267,8 @@ Agent(
            result with extracted decisions only.
 
            OBSIDIAN FORMAT REQUIREMENT:
-           When writing or appending to DECISIONS.md, ensure it has this frontmatter:
-           ---
-           title: 'Decisions — Phase <N>: <phase_name>'
-           type: decision-log
-           phase: <N>
-           project: '[[../../PROJECT]]'
-           plan: '[[PLAN]]'
-           project_slug: <slug>
-           tags:
-             - gsd
-             - decisions
-             - phase/<N>
-             - project/<slug>
-           created: <today>
-           updated: <today>
-           ---
+           When writing or appending to DECISIONS.md, use log_decision.sh or
+           scripts/obsidian_meta.sh ensure-frontmatter. Do not hand-write YAML.
            Use > [!important] callouts for critical decisions logged in the body."
 )
 ```
@@ -310,24 +297,86 @@ Agent(
            the JSON result with extracted decisions only.
 
            OBSIDIAN FORMAT REQUIREMENT:
-           When appending engineering decisions to DECISIONS.md, preserve existing
-           Obsidian frontmatter and update the 'updated' field. Use > [!warning]
-           callouts for technical risks and constraints identified in the review."
+           When appending engineering decisions to DECISIONS.md, use
+           log_decision.sh or scripts/obsidian_meta.sh ensure-frontmatter so the
+           helper preserves frontmatter and updates the 'updated' field. Use
+           > [!warning] callouts for technical risks and constraints identified
+           in the review. Do not hand-write YAML."
 )
 ```
 
-### Step 2.4 — Advance to brainstorm gate
+### Step 2.4 — Advance to design plan review
 
 ```bash
 bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
   "eng-review" "[extracted engineering decisions]"
 
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_BRAINSTORM"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
 
 bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 ```
 
-**→ Proceed to PHASE 3**
+**→ Proceed to PHASE 2.5**
+
+---
+
+## PHASE 2.5 — GSTACK DESIGN PLAN REVIEW
+
+**Trigger:** `loop_state` is `GSTACK_DESIGN_PLAN`
+
+This phase gives the GStack Designer / Design Reviewer role a chance to review
+the milestone before Superpowers turns the plan into execution detail.
+
+### Step 2.5.1 — Dispatch gss-designer for design plan review
+
+Use **Agent/Task tool**:
+
+```
+Agent(
+  subagent_type: "gss-designer",
+  prompt: "Mode: DESIGN_PLAN
+
+           Review the current milestone plan for UI/UX, interaction, visual
+           hierarchy, accessibility, and product-design risk.
+
+           Read:
+           - $GSD_PLAN_FILE
+           - $GSD_DECISIONS_FILE
+           - .planning/RESEARCH.md
+           - .planning/shared_context.md
+           - .planning/DESIGN.md if present
+
+           Invoke plan-design-review via the Skill tool and follow its full
+           workflow. If the project has no design direction, use
+           design-consultation. If multiple directions are needed, use
+           design-shotgun. If a concrete HTML artifact is needed, use
+           design-html.
+
+           Write compact design notes to .planning/phases/<phase>/DESIGN.md
+           when needed. Normalize metadata with scripts/obsidian_meta.sh.
+           Return DESIGN_PLAN JSON only."
+)
+```
+
+### Step 2.5.2 — Parse design plan result
+
+**If `status: APPROVED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/log_decision.sh \
+  "design-plan" "[extracted design decisions]"
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_BRAINSTORM"
+bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
+```
+→ Proceed to PHASE 3
+
+**If `status: NEEDS_CLARIFICATION`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DESIGN PLAN NEEDS CLARIFICATION: [open_questions]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW"
+```
+→ Return to PHASE 2 with the design question in context
 
 ---
 
@@ -362,39 +411,9 @@ Agent(
            Return DESIGN_CONFIRMED JSON or BLOCKED JSON.
 
            OBSIDIAN FORMAT REQUIREMENT:
-           When writing BRAINSTORM_DOC.md, prepend this frontmatter:
-           ---
-           title: 'Brainstorm — Phase <N>: <phase_name>'
-           type: brainstorm
-           phase: <N>
-           project: '[[../../PROJECT]]'
-           plan: '[[PLAN]]'
-           decisions: '[[DECISIONS]]'
-           project_slug: <slug>
-           tags:
-             - gsd
-             - brainstorm
-             - phase/<N>
-             - project/<slug>
-           created: <today>
-           ---
-           When refining PLAN.md, ensure it has this frontmatter (add if missing):
-           ---
-           title: 'Phase <N>: <phase_name>'
-           type: plan
-           phase: <N>
-           status: in-progress
-           project: '[[../../PROJECT]]'
-           roadmap: '[[../../ROADMAP]]'
-           project_slug: <slug>
-           tags:
-             - gsd
-             - plan
-             - phase/<N>
-             - project/<slug>
-           created: <today>
-           updated: <today>
-           ---
+           Write BRAINSTORM_DOC.md and refine PLAN.md as normal Markdown, then
+           run scripts/obsidian_meta.sh normalize-known so the helper manages
+           brainstorm and plan frontmatter. Do not hand-write YAML.
            Use > [!info] callouts for approach comparisons, > [!important] for the
            chosen approach rationale."
 )
@@ -550,9 +569,9 @@ Agent(
 
 **If GStack QA returns `status: PASSED`:**
 ```bash
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_QA"
 ```
-→ Proceed to PHASE 6
+→ Proceed to PHASE 5.5
 
 **If GStack QA returns `status: FAILED`:**
 ```bash
@@ -561,6 +580,105 @@ bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
 bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
 ```
 → Return to PHASE 4 (re-dispatch gss-executor with failure context)
+
+---
+
+## PHASE 5.5 — GSTACK DESIGN QA
+
+**Trigger:** `loop_state` is `GSTACK_DESIGN_QA`
+
+### Step 5.5.1 — Dispatch gss-designer for visual/design QA
+
+```
+Agent(
+  subagent_type: "gss-designer",
+  prompt: "Mode: DESIGN_QA
+
+           Run post-implementation visual/design QA for the completed milestone.
+
+           Read:
+           - $GSD_PLAN_FILE
+           - $GSD_DECISIONS_FILE
+           - $GSD_BRAINSTORM_DOC
+           - $GSD_PROJECT_DESIGN and $GSD_PHASE_DESIGN if present
+           - implementation artifacts and relevant screenshots/test evidence
+
+           Invoke design-review via the Skill tool and follow its full workflow.
+           Write the compact report to .planning/phases/<phase>/DESIGN_QA.md.
+           Normalize metadata with scripts/obsidian_meta.sh.
+
+           Return DESIGN_QA JSON only."
+)
+```
+
+### Step 5.5.2 — Parse design QA result
+
+**If `status: PASSED` or `SKIPPED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DOCS"
+```
+→ Proceed to PHASE 5.6
+
+**If `status: FAILED`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DESIGN QA FAILED: [paste issues[] from gss-designer JSON]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+```
+→ Return to PHASE 4
+
+---
+
+## PHASE 5.6 — GSTACK DOCUMENTATION
+
+**Trigger:** `loop_state` is `GSTACK_DOCS`
+
+### Step 5.6.1 — Dispatch gss-docs
+
+```
+Agent(
+  subagent_type: "gss-docs",
+  prompt: "Mode: RELEASE_DOCS
+
+           Update documentation for the completed milestone after functional QA
+           and design QA have passed.
+
+           Read:
+           - $GSD_PLAN_FILE
+           - $GSD_DECISIONS_FILE
+           - $GSD_BRAINSTORM_DOC
+           - $GSD_DESIGN_QA_REPORT
+           - changed files from git
+
+           Invoke document-release via the Skill tool and follow its full
+           workflow. Use document-generate only for missing docs. Use make-pdf
+           only when the milestone explicitly requires a PDF.
+
+           Write the compact report to .planning/phases/<phase>/DOCS_REPORT.md.
+           Normalize metadata with scripts/obsidian_meta.sh.
+
+           Return RELEASE_DOCS JSON only."
+)
+```
+
+### Step 5.6.2 — Parse docs result
+
+**If `status: DOCS_DONE`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
+bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSD_DISPATCH"
+```
+→ Proceed to PHASE 6
+
+**If `status: NEEDS_CLARIFICATION`:**
+```bash
+bash $(cat .planning/.gss_home)/scripts/inject_answer.sh \
+  "DOCS NEED CLARIFICATION: [open_questions]"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "SP_EXECUTING"
+```
+→ Return to PHASE 4 with docs clarification in context
 
 ---
 
@@ -611,7 +729,8 @@ bash $(cat .planning/.gss_home)/scripts/print_summary.sh
 2. **Subagent dispatch, not inline Skill invocation.** Never call the `Skill`
    tool directly on GSD/GStack/Superpowers from the orchestrator context.
    Always dispatch through a wrapper subagent (`gss-gsd-runner`, `gss-reviewer`,
-   `gss-brainstormer`, `gss-executor`) using Agent/Task tool.
+   `gss-designer`, `gss-brainstormer`, `gss-executor`, `gss-docs`) using
+   Agent/Task tool.
    The subagent handles Skill invocation inside its own isolated context and
    returns compact JSON.
 
@@ -647,10 +766,13 @@ GSD and Superpowers communicate through these files:
 | `PROJECT.md` | gss-gsd-runner (GSD) | All agents | `project` |
 | `ROADMAP.md` | gss-gsd-runner (GSD) | Orchestrator, gss-reviewer | `roadmap` |
 | `PLAN.md` (draft) | gss-gsd-runner (GSD) | gss-brainstormer | `plan` |
-| `DECISIONS.md` | gss-reviewer (GStack) | gss-brainstormer, gss-executor | `decision-log` |
+| `DECISIONS.md` | gss-reviewer (GStack) | gss-designer, gss-brainstormer, gss-executor | `decision-log` |
+| `DESIGN.md` | gss-designer (GStack) | gss-brainstormer, gss-executor, gss-docs | `design` |
 | `BRAINSTORM_DOC.md` | gss-brainstormer | gss-executor (via EXEC_PROMPT) | `brainstorm` |
 | `PLAN.md` (refined) | gss-brainstormer | gss-executor | `plan` |
 | `EXEC_PROMPT.md` | write_exec_prompt.sh | gss-executor | — |
+| `DESIGN_QA.md` | gss-designer (GStack) | gss-docs, GSD dispatch | `design-qa` |
+| `DOCS_REPORT.md` | gss-docs (GStack) | GSD dispatch, release summary | `documentation` |
 | `bases/*.base` | scripts/obsidian_meta.sh (Step 1.5) | Obsidian vault | — |
 
 ---
@@ -706,10 +828,14 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 | `PROJECT.md` | `project` |
 | `ROADMAP.md` | `roadmap` |
 | `DECISIONS.md` | `decision-log` |
+| `DESIGN.md` | `design` |
 | `shared_context.md` | `shared-context` |
 | `CHECKPOINT_HISTORY.md` | `checkpoint-log` |
 | `phases/<phase>/PLAN.md` | `plan` |
 | `phases/<phase>/DECISIONS.md` | `decision-log` |
+| `phases/<phase>/DESIGN.md` | `design` |
+| `phases/<phase>/DESIGN_QA.md` | `design-qa` |
+| `phases/<phase>/DOCS_REPORT.md` | `documentation` |
 | `phases/<phase>/BRAINSTORM_DOC.md` | `brainstorm` |
 | `phases/<phase>/EXEC_PROMPT.md` | `execution-prompt` |
 
