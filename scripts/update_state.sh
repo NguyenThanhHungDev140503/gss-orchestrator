@@ -6,15 +6,16 @@
 # Usage:
 #   bash scripts/update_state.sh GSTACK_REVIEW "phase-01-auth"
 #   bash scripts/update_state.sh SP_EXECUTING
-#   bash scripts/update_state.sh GSTACK_REVIEW "phase-01-auth" true
+#   bash scripts/update_state.sh GSTACK_REVIEW "phase-01-auth" true "REST API and CLI"
 
 set -e
 STATE_FILE=".planning/GSS_STATE.json"
 NEW_STATE="${1:-}"
 MILESTONE="${2:-}"
 DEVEX="${3:-}"
+DEVEX_RATIONALE="${4:-}"
 
-[ -z "$NEW_STATE" ] && echo "Usage: update_state.sh <STATE> [milestone] [devex_surface]" && exit 1
+[ -z "$NEW_STATE" ] && echo "Usage: update_state.sh <STATE> [milestone] [devex_surface] [devex_rationale]" && exit 1
 
 mkdir -p .planning
 
@@ -25,6 +26,8 @@ if [ -f "$STATE_FILE" ] && command -v jq &>/dev/null; then
     && mv "${TMP}2" "$TMP"
   [ -n "$DEVEX" ] && jq --argjson d "$DEVEX" '.devex_surface = $d' "$TMP" > "${TMP}3" \
     && mv "${TMP}3" "$TMP"
+  [ -n "$DEVEX_RATIONALE" ] && jq --arg r "$DEVEX_RATIONALE" '.devex_rationale = $r' "$TMP" > "${TMP}4" \
+    && mv "${TMP}4" "$TMP"
   mv "$TMP" "$STATE_FILE"
 elif [ -f "$STATE_FILE" ]; then
   TMP=$(mktemp)
@@ -38,19 +41,30 @@ elif [ -f "$STATE_FILE" ]; then
       sed -i "s/\"current_milestone\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/&,\n  \"devex_surface\": $DEVEX/" "$TMP"
     fi
   fi
+  if [ -n "$DEVEX_RATIONALE" ]; then
+    ESCAPED_RATIONALE=$(printf '%s' "$DEVEX_RATIONALE" | sed 's/[\/&]/\\&/g')
+    if grep -q '"devex_rationale"' "$TMP"; then
+      sed -i "s/\"devex_rationale\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"devex_rationale\": \"$ESCAPED_RATIONALE\"/" "$TMP"
+    else
+      sed -i "s/\"current_milestone\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/&,\n  \"devex_rationale\": \"$ESCAPED_RATIONALE\"/" "$TMP"
+    fi
+  fi
   mv "$TMP" "$STATE_FILE"
 else
   DEVEX_FIELD=""
   [ -n "$DEVEX" ] && DEVEX_FIELD="  \"devex_surface\": $DEVEX,"
+  DEVEX_RATIONALE_FIELD=""
+  [ -n "$DEVEX_RATIONALE" ] && DEVEX_RATIONALE_FIELD="  \"devex_rationale\": \"$DEVEX_RATIONALE\","
   cat > "$STATE_FILE" << EOF
 {
   "loop_state": "$NEW_STATE",
   "current_milestone": "${MILESTONE:-null}",
 $DEVEX_FIELD
+$DEVEX_RATIONALE_FIELD
   "milestones_done": [],
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
 fi
 
-echo "✓ State → $NEW_STATE${MILESTONE:+ (milestone: $MILESTONE)}${DEVEX:+ (devex_surface: $DEVEX)}"
+echo "✓ State → $NEW_STATE${MILESTONE:+ (milestone: $MILESTONE)}${DEVEX:+ (devex_surface: $DEVEX)}${DEVEX_RATIONALE:+ (devex_rationale saved)}"

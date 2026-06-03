@@ -215,7 +215,8 @@ If `.planning/` was not created → re-invoke, do not proceed.
 
 ```bash
 DEVEX_SURFACE=$(echo '<planning_json_result>' | jq -r '.devex_surface // false')
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>" "$DEVEX_SURFACE"
+DEVEX_RATIONALE=$(echo '<planning_json_result>' | jq -r '.devex_rationale // ""')
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<phase-from-STATE.md>" "$DEVEX_SURFACE" "$DEVEX_RATIONALE"
 ```
 
 ### Step 1.5 — Generate Obsidian Bases query files
@@ -338,14 +339,20 @@ DEVEX=$(jq -r '.devex_surface // false' .planning/GSS_STATE.json)
 if [ "$DEVEX" != "true" ]; then
   echo "No developer-facing surface detected — skipping DX review"
   bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+  bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 fi
 ```
 
-If `DEVEX` is not `true`, skip to PHASE 2.5 immediately.
+If `DEVEX` is not `true`, do not dispatch `gss-devex-reviewer`; re-enter the
+loop at PHASE 2.5 (`GSTACK_DESIGN_PLAN`) immediately.
 
 ### Step 2.3.2 — Dispatch gss-devex-reviewer
 
 Use **Agent/Task tool**:
+
+```bash
+DEVEX_RATIONALE=$(jq -r '.devex_rationale // ""' .planning/GSS_STATE.json)
+```
 
 ```
 Agent(
@@ -361,7 +368,7 @@ Agent(
            - .planning/RESEARCH.md
            - .planning/shared_context.md
 
-           devex_rationale: [paste devex_rationale from PLANNING_COMPLETE JSON if available]
+           devex_rationale: $DEVEX_RATIONALE
 
            Invoke plan-devex-review via the Skill tool and follow its full
            workflow. Write compact DX findings to $GSD_DEVEX_REVIEW.

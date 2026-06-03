@@ -16,9 +16,11 @@ EOF
 
 (
   cd "$tmpdir"
-  bash "$SCRIPT" "GSTACK_REVIEW" "01-auth" "true"
+  bash "$SCRIPT" "GSTACK_REVIEW" "01-auth" "true" "Project exposes a REST API and CLI"
   val=$(jq -r '.devex_surface' .planning/GSS_STATE.json)
   [ "$val" = "true" ] || fail "Expected devex_surface=true, got '$val'"
+  rationale=$(jq -r '.devex_rationale' .planning/GSS_STATE.json)
+  [ "$rationale" = "Project exposes a REST API and CLI" ] || fail "Expected devex_rationale preserved, got '$rationale'"
 )
 
 (
@@ -33,6 +35,8 @@ EOF
   bash "$SCRIPT" "SP_BRAINSTORM"
   val=$(jq -r '.devex_surface' .planning/GSS_STATE.json)
   [ "$val" = "false" ] || fail "Expected devex_surface preserved as false, got '$val'"
+  rationale=$(jq -r '.devex_rationale' .planning/GSS_STATE.json)
+  [ "$rationale" = "Project exposes a REST API and CLI" ] || fail "Expected devex_rationale preserved, got '$rationale'"
 )
 
 (
@@ -45,6 +49,8 @@ EOF
   PATH="$fakebin" "$BASH" "$SCRIPT" "GSTACK_DOCS"
   val=$(jq -r '.devex_surface' .planning/GSS_STATE.json)
   [ "$val" = "false" ] || fail "Expected fallback path to preserve devex_surface=false, got '$val'"
+  rationale=$(jq -r '.devex_rationale' .planning/GSS_STATE.json)
+  [ "$rationale" = "Project exposes a REST API and CLI" ] || fail "Expected fallback path to preserve devex_rationale, got '$rationale'"
 )
 
 echo "update_state devex contract ok"

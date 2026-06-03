@@ -53,18 +53,20 @@ if [ ! -f "$SKILL_SRC/SKILL.md" ]; then
   exit 1
 fi
 
-if [ ! -d "$SKILL_SRC/agents" ]; then
-  echo -e "${RED}ERROR: agents/ not found at $SKILL_SRC${NC}"
-  echo "The installer needs wrapper subagents, including gss-devex-reviewer.md."
-  exit 1
-fi
-
-for required_agent in "${REQUIRED_AGENTS[@]}"; do
-  if [ ! -f "$SKILL_SRC/agents/$required_agent" ]; then
-    echo -e "${RED}ERROR: required subagent missing: $required_agent${NC}"
+if [ "$INSTALL_AGENTS" = true ]; then
+  if [ ! -d "$SKILL_SRC/agents" ]; then
+    echo -e "${RED}ERROR: agents/ not found at $SKILL_SRC${NC}"
+    echo "The installer needs wrapper subagents, including gss-devex-reviewer.md."
     exit 1
   fi
-done
+
+  for required_agent in "${REQUIRED_AGENTS[@]}"; do
+    if [ ! -f "$SKILL_SRC/agents/$required_agent" ]; then
+      echo -e "${RED}ERROR: required subagent missing: $required_agent${NC}"
+      exit 1
+    fi
+  done
+fi
 
 # ── Chọn scope nếu chưa truyền flag ───────────────────────────────────────
 if [ -z "$SCOPE" ]; then

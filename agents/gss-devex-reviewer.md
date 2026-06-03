@@ -51,7 +51,28 @@ Extract:
 - Open product/API questions that require orchestrator routing
 - Recommended improvements within the plan's current scope
 
-Write compact DX findings to `$GSD_DEVEX_REVIEW`:
+Write compact DX findings to `$GSD_DEVEX_REVIEW` before normalizing metadata:
+
+```markdown
+# Developer Experience Review
+
+## Decisions
+- [DX] ...
+
+## Gaps
+- ...
+
+## Time To Hello World
+...
+
+## Open Questions
+- ...
+
+## Recommended Improvements
+- ...
+```
+
+Then normalize the artifact:
 
 ```bash
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh \

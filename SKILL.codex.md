@@ -238,7 +238,8 @@ cat .planning/STATE.md
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
 DEVEX_SURFACE="<true-or-false-from-planning-output>"
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>" "$DEVEX_SURFACE"
+DEVEX_RATIONALE="<one-sentence-rationale-from-planning-output>"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>" "$DEVEX_SURFACE" "$DEVEX_RATIONALE"
 ```
 
 Research stays in the single file `.planning/RESEARCH.md` (compatible mode); it
@@ -330,10 +331,19 @@ DEVEX=$(jq -r '.devex_surface // false' .planning/GSS_STATE.json)
 if [ "$DEVEX" != "true" ]; then
   echo "No developer-facing surface detected — skipping DX review"
   bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_DESIGN_PLAN"
+  bash $(cat .planning/.gss_home)/scripts/checkpoint.sh
 fi
 ```
 
-If `DEVEX=true`, spawn one DX review subagent. Its **initial message must begin with**:
+If `DEVEX` is not `true`, do not spawn the DX review subagent; re-enter the loop
+at PHASE 2.5 (`GSTACK_DESIGN_PLAN`) immediately.
+
+If `DEVEX=true`, read the persisted rationale:
+```bash
+DEVEX_RATIONALE=$(jq -r '.devex_rationale // ""' .planning/GSS_STATE.json)
+```
+
+Then spawn one DX review subagent. Its **initial message must begin with**:
 ```text
 $plan-devex-review
 Review this milestone plan for developer experience gaps: getting-started
@@ -346,7 +356,7 @@ Read:
 - RESEARCH.md
 - shared_context.md
 
-devex_rationale: [paste DEVEX_RATIONALE from planning output if available]
+devex_rationale: [paste DEVEX_RATIONALE from .planning/GSS_STATE.json]
 
 Write compact DX findings to .planning/phases/<phase>/DEVEX_REVIEW.md.
 Use scripts/obsidian_meta.sh to normalize metadata; do not hand-write YAML.
