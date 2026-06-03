@@ -180,7 +180,7 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known 2>/dev/
 ```json
 {
   "mode": "DEVEX_REVIEW",
-  "status": "APPROVED | NEEDS_CLARIFICATION | SKIPPED",
+  "status": "APPROVED | NEEDS_CLARIFICATION",
   "decisions": ["[DX] Getting started flow reduced to 3 steps"],
   "dx_gaps": ["Missing error message for invalid API key"],
   "tthw_estimate": "~4 min",
@@ -224,6 +224,12 @@ if [ -n "${3:-}" ]; then
     && mv /tmp/gss_state_tmp.json .planning/GSS_STATE.json
 fi
 ```
+
+**Note on timing:** `devex_surface` is written to `GSS_STATE.json` at the end of Phase 1
+Step 1.4 (when `update_state.sh "GSTACK_REVIEW"` is called with `$3` = value from
+`gss-gsd-runner` PLANNING_COMPLETE JSON). By the time Phase 2 ends and
+`GSTACK_DX_REVIEW` is the next state, `devex_surface` is already in state — Step 2.3.1
+reads it via `jq`.
 
 ### `agents/gss-gsd-runner.md`
 
