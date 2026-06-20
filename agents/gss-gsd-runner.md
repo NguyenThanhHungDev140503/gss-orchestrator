@@ -37,7 +37,8 @@ GSD skill, invoke it, then extract the state signal.
 ### Mode: PLANNING
 
 Trigger: orchestrator is in `PLANNING` state, requirements are gathered,
-optional research findings exist at `.planning/RESEARCH.md`.
+optional research findings exist at `.planning/RESEARCH.md`, and existing
+projects may also have discovery artifacts from `gss-discoverer`.
 
 Steps:
 1. Read inputs:
@@ -45,22 +46,38 @@ Steps:
    [ -f .planning/REQUIREMENTS.md ] && cat .planning/REQUIREMENTS.md
    [ -f .planning/RESEARCH.md ] && cat .planning/RESEARCH.md
    ```
-2. Decide which GSD skill applies:
-   - `.planning/` does not exist → invoke `gsd-new-project` (skip questioning
-     by passing requirements directly)
+2. Read `project_mode` from `.planning/GSS_STATE.json` when present:
+   - `new_project`: create a greenfield roadmap for the full system.
+   - `existing_project`: create a delta roadmap from current state to the
+     requested target.
+   - `existing_project_with_planning`: preserve existing planning artifacts,
+     then fill only missing roadmap/phase-plan gaps.
+3. For brownfield modes, also read:
+   ```bash
+   cat .planning/CURRENT_STATE.md 2>/dev/null || true
+   cat .planning/CODEBASE_MAP.md 2>/dev/null || true
+   cat .planning/BASELINE.md 2>/dev/null || true
+   cat .planning/DOCS_INGEST.md 2>/dev/null || true
+   cat .planning/INTEGRATION_RISKS.md 2>/dev/null || true
+   ```
+4. Decide which GSD skill applies:
+   - No `.planning/ROADMAP.md` → invoke `gsd-new-project` with the mode-specific
+     context. For brownfield, instruct it to describe the existing project and
+     produce a delta roadmap, not a from-scratch rebuild.
    - `.planning/ROADMAP.md` exists, no current phase planned →
      invoke `gsd-plan-phase`
-3. Use the Skill tool with the chosen skill name. Pass the requirements
-   and research as context. Let GSD run its full flow including any
-   AskUserQuestion gates — answer them using the requirements when possible.
+5. Use the Skill tool with the chosen skill name. Pass the requirements,
+   research, and brownfield discovery artifacts as context. Let GSD run its full
+   flow including any AskUserQuestion gates — answer them using the requirements
+   and discovery artifacts when possible.
 4. After GSD completes, read result from disk:
    ```bash
    ls .planning/
    cat .planning/STATE.md 2>/dev/null
    cat .planning/ROADMAP.md 2>/dev/null | head -40
    ```
-5. Extract `current_phase` from STATE.md.
-6. Classify developer-facing surface: based on `.planning/REQUIREMENTS.md`,
+6. Extract `current_phase` from STATE.md.
+7. Classify developer-facing surface: based on `.planning/REQUIREMENTS.md`,
    `.planning/RESEARCH.md`, and the current phase `PLAN.md`, determine if the
    project has a developer-facing surface (API, CLI, SDK, library, npm package,
    platform, docs, Claude Code skill). Set:

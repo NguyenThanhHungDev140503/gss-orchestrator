@@ -14,8 +14,9 @@ NEW_STATE="${1:-}"
 MILESTONE="${2:-}"
 DEVEX="${3:-}"
 DEVEX_RATIONALE="${4:-}"
+PROJECT_MODE="${5:-}"
 
-[ -z "$NEW_STATE" ] && echo "Usage: update_state.sh <STATE> [milestone] [devex_surface] [devex_rationale]" && exit 1
+[ -z "$NEW_STATE" ] && echo "Usage: update_state.sh <STATE> [milestone] [devex_surface] [devex_rationale] [project_mode]" && exit 1
 
 mkdir -p .planning
 
@@ -28,6 +29,8 @@ if [ -f "$STATE_FILE" ] && command -v jq &>/dev/null; then
     && mv "${TMP}3" "$TMP"
   [ -n "$DEVEX_RATIONALE" ] && jq --arg r "$DEVEX_RATIONALE" '.devex_rationale = $r' "$TMP" > "${TMP}4" \
     && mv "${TMP}4" "$TMP"
+  [ -n "$PROJECT_MODE" ] && jq --arg m "$PROJECT_MODE" '.project_mode = $m' "$TMP" > "${TMP}5" \
+    && mv "${TMP}5" "$TMP"
   mv "$TMP" "$STATE_FILE"
 elif [ -f "$STATE_FILE" ]; then
   TMP=$(mktemp)
@@ -49,22 +52,33 @@ elif [ -f "$STATE_FILE" ]; then
       sed -i "s/\"current_milestone\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/&,\n  \"devex_rationale\": \"$ESCAPED_RATIONALE\"/" "$TMP"
     fi
   fi
+  if [ -n "$PROJECT_MODE" ]; then
+    ESCAPED_PROJECT_MODE=$(printf '%s' "$PROJECT_MODE" | sed 's/[\/&]/\\&/g')
+    if grep -q '"project_mode"' "$TMP"; then
+      sed -i "s/\"project_mode\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"project_mode\": \"$ESCAPED_PROJECT_MODE\"/" "$TMP"
+    else
+      sed -i "s/\"current_milestone\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/&,\n  \"project_mode\": \"$ESCAPED_PROJECT_MODE\"/" "$TMP"
+    fi
+  fi
   mv "$TMP" "$STATE_FILE"
 else
   DEVEX_FIELD=""
   [ -n "$DEVEX" ] && DEVEX_FIELD="  \"devex_surface\": $DEVEX,"
   DEVEX_RATIONALE_FIELD=""
   [ -n "$DEVEX_RATIONALE" ] && DEVEX_RATIONALE_FIELD="  \"devex_rationale\": \"$DEVEX_RATIONALE\","
+  PROJECT_MODE_FIELD=""
+  [ -n "$PROJECT_MODE" ] && PROJECT_MODE_FIELD="  \"project_mode\": \"$PROJECT_MODE\","
   cat > "$STATE_FILE" << EOF
 {
   "loop_state": "$NEW_STATE",
   "current_milestone": "${MILESTONE:-null}",
 $DEVEX_FIELD
 $DEVEX_RATIONALE_FIELD
+$PROJECT_MODE_FIELD
   "milestones_done": [],
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
 fi
 
-echo "✓ State → $NEW_STATE${MILESTONE:+ (milestone: $MILESTONE)}${DEVEX:+ (devex_surface: $DEVEX)}${DEVEX_RATIONALE:+ (devex_rationale saved)}"
+echo "✓ State → $NEW_STATE${MILESTONE:+ (milestone: $MILESTONE)}${DEVEX:+ (devex_surface: $DEVEX)}${DEVEX_RATIONALE:+ (devex_rationale saved)}${PROJECT_MODE:+ (project_mode: $PROJECT_MODE)}"

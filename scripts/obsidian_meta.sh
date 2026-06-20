@@ -263,6 +263,11 @@ normalize_known() {
   ensure_frontmatter "$PLANNING_DIR/DECISIONS.md" decision-log
   ensure_frontmatter "$PLANNING_DIR/DESIGN.md" design
   ensure_frontmatter "$PLANNING_DIR/shared_context.md" shared-context
+  ensure_frontmatter "$PLANNING_DIR/CURRENT_STATE.md" current-state
+  ensure_frontmatter "$PLANNING_DIR/CODEBASE_MAP.md" codebase-map
+  ensure_frontmatter "$PLANNING_DIR/BASELINE.md" baseline
+  ensure_frontmatter "$PLANNING_DIR/DOCS_INGEST.md" docs-ingest
+  ensure_frontmatter "$PLANNING_DIR/INTEGRATION_RISKS.md" integration-risks
   ensure_frontmatter "$PLANNING_DIR/CHECKPOINT_HISTORY.md" checkpoint-log
 
   local phase_dir phase

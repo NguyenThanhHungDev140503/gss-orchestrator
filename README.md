@@ -75,11 +75,11 @@ Giải pháp của GSS Orchestrator dựa trên 4 nguyên tắc:
 Trạng thái lưu tại `.planning/GSS_STATE.json` và được đọc đầu mỗi turn:
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
-                                        ↕                ↕                                      ↕
-                                  GStack routing   skip if no devex_surface               GStack routing
-                                  cho blocking Qs                                          cho design Qs
-                                  └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
+IDLE → PROJECT_INTAKE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+          │                           ↑                ↕                ↕                                      ↕
+          └─ existing project         │          GStack routing   skip if no devex_surface               GStack routing
+             → PROJECT_DISCOVERY ─────┘          cho blocking Qs                                          cho design Qs
+                                                   └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
 
 Validation failure path:
 GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS → SP_DEBUGGING → SP_EXECUTING
@@ -87,9 +87,11 @@ GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS → SP_DEBUGGING → SP_EXECUTING
 
 | State | Trigger | Subagent dispatch |
 |---|---|---|
-| `IDLE` | Phiên mới khởi tạo | (chuyển ngay sang `RESEARCH`) |
+| `IDLE` | Phiên mới khởi tạo | (chuyển ngay sang `PROJECT_INTAKE`) |
+| `PROJECT_INTAKE` | User gửi requirements/design docs | Orchestrator phân loại `new_project`, `existing_project`, hoặc `existing_project_with_planning` |
+| `PROJECT_DISCOVERY` | Project có source/docs hiện hữu | `gss-discoverer` tạo current-state/codebase/baseline/docs/risk artifacts |
 | `RESEARCH` | User gửi requirements | `gss-researcher` |
-| `PLANNING` | RESEARCH.md đã tạo | `gss-gsd-runner` (mode `PLANNING`) |
+| `PLANNING` | RESEARCH.md đã tạo | `gss-gsd-runner` (mode `PLANNING`, greenfield hoặc brownfield delta roadmap) |
 | `GSTACK_REVIEW` | PLAN.md đã có | `gss-reviewer` ×2 (CEO → Engineering) |
 | `GSTACK_DX_REVIEW` | `devex_surface=true` sau CEO/Engineering review | `gss-devex-reviewer` |
 | `GSTACK_DESIGN_PLAN` | CEO/Engineering decisions đã có | `gss-designer` (mode `DESIGN_PLAN`) |
@@ -108,6 +110,7 @@ GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS → SP_DEBUGGING → SP_EXECUTING
 
 | Phase | Wrapper subagent | Skill được gọi | Plugin |
 |---|---|---|---|
+| 0a — PROJECT_DISCOVERY | `gss-discoverer` | (không có — đọc repo/docs và chạy baseline trực tiếp) | — |
 | 0 — RESEARCH | `gss-researcher` | (không có — dùng `WebSearch`/`WebFetch` trực tiếp) | — |
 | 1 — PLANNING | `gss-gsd-runner` | `gsd-new-project` hoặc `gsd-plan-phase` | GSD |
 | 2 — GSTACK_REVIEW | `gss-reviewer` | `plan-ceo-review`, rồi `plan-eng-review` | GStack |
@@ -122,7 +125,7 @@ GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS → SP_DEBUGGING → SP_EXECUTING
 | 5.7 — SP_DEBUGGING | `gss-debugger` | `superpowers:systematic-debugging` | Superpowers |
 | 6 — GSD_DISPATCH | `gss-gsd-runner` | `gsd-plan-phase` (cho phase tiếp theo) | GSD |
 
-**Lưu ý:** `gss-researcher` cố ý KHÔNG có `Skill` tool vì nó chỉ tạo research context. QA cuối milestone phải đi qua GStack QA role bằng `gss-reviewer`; test runner cục bộ chỉ là bằng chứng đầu vào, không phải QA authority.
+**Lưu ý:** `gss-researcher` và `gss-discoverer` cố ý KHÔNG có `Skill` tool vì chúng chỉ tạo context. Với project có sẵn, GSS tạo **delta roadmap** từ trạng thái hiện tại đến mục tiêu, không tạo roadmap "build lại từ đầu". QA cuối milestone phải đi qua GStack QA role bằng `gss-reviewer`; test runner cục bộ chỉ là bằng chứng đầu vào, không phải QA authority.
 
 ---
 
@@ -296,6 +299,7 @@ gsd-gstack-sp-orchestrator/
 ├── install_hermes.sh           # Hermes installer
 ├── agents/                     # Wrapper subagents
 │   ├── gss-researcher.md       #   Phase 0 — web research
+│   ├── gss-discoverer.md       #   Phase 0a — existing-project discovery
 │   ├── gss-gsd-runner.md       #   Phase 1, 6 — GSD wrapper
 │   ├── gss-reviewer.md         #   Phase 2, 3b, 5 — GStack wrapper
 │   ├── gss-devex-reviewer.md   #   Phase 2.3 — GStack DX wrapper
@@ -338,6 +342,11 @@ gsd-gstack-sp-orchestrator/
 ├── GSS_STATE.json              # Loop state, current phase
 ├── .project_slug               # Obsidian tag-safe project slug
 ├── REQUIREMENTS.md             # User input
+├── CURRENT_STATE.md            # Existing-project capabilities and gaps
+├── CODEBASE_MAP.md             # Existing architecture, modules, entry points
+├── BASELINE.md                 # Baseline test/lint/typecheck status
+├── DOCS_INGEST.md              # Existing docs/ADR/spec facts
+├── INTEGRATION_RISKS.md        # Brownfield compatibility risks
 ├── RESEARCH.md                 # Phase 0 output (research source of truth)
 ├── ROADMAP.md                  # Phase 1 output (GSD)
 ├── DECISIONS.md                # Append-only audit log
@@ -361,6 +370,10 @@ gsd-gstack-sp-orchestrator/
     ├── OPEN_QUESTIONS.md       # Blocked questions (Phase 3b)
     └── logs/                   # Full GStack/QA transcripts
 ```
+
+Brownfield discovery writes the same artifacts at `.planning/CURRENT_STATE.md`,
+`.planning/CODEBASE_MAP.md`, `.planning/BASELINE.md`,
+`.planning/DOCS_INGEST.md`, and `.planning/INTEGRATION_RISKS.md`.
 
 ---
 

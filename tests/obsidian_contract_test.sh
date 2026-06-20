@@ -76,6 +76,26 @@ EOF
 cat > "$tmpdir/.planning/shared_context.md" <<'EOF'
 # Shared Context
 EOF
+cat > "$tmpdir/.planning/CURRENT_STATE.md" <<'EOF'
+# Current State
+Existing app has auth and billing.
+EOF
+cat > "$tmpdir/.planning/CODEBASE_MAP.md" <<'EOF'
+# Codebase Map
+Entry points and modules.
+EOF
+cat > "$tmpdir/.planning/BASELINE.md" <<'EOF'
+# Baseline Verification
+Tests currently pass.
+EOF
+cat > "$tmpdir/.planning/DOCS_INGEST.md" <<'EOF'
+# Docs Ingest
+README and ADRs reviewed.
+EOF
+cat > "$tmpdir/.planning/INTEGRATION_RISKS.md" <<'EOF'
+# Integration Risks
+Feature must preserve public API.
+EOF
 cat > "$tmpdir/.planning/phases/01-demo/PLAN.md" <<'EOF'
 # Plan
 - [ ] Add test
@@ -130,6 +150,11 @@ assert_contains "$tmpdir/.planning/RESEARCH.md" "Use boring tech."
 assert_frontmatter_type "$tmpdir/.planning/ROADMAP.md" "roadmap"
 assert_frontmatter_type "$tmpdir/.planning/DECISIONS.md" "decision-log"
 assert_frontmatter_type "$tmpdir/.planning/shared_context.md" "shared-context"
+assert_frontmatter_type "$tmpdir/.planning/CURRENT_STATE.md" "current-state"
+assert_frontmatter_type "$tmpdir/.planning/CODEBASE_MAP.md" "codebase-map"
+assert_frontmatter_type "$tmpdir/.planning/BASELINE.md" "baseline"
+assert_frontmatter_type "$tmpdir/.planning/DOCS_INGEST.md" "docs-ingest"
+assert_frontmatter_type "$tmpdir/.planning/INTEGRATION_RISKS.md" "integration-risks"
 assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/PLAN.md" "plan"
 assert_contains "$tmpdir/.planning/phases/01-demo/PLAN.md" "phase: 01-demo"
 assert_frontmatter_type "$tmpdir/.planning/phases/01-demo/DECISIONS.md" "decision-log"
@@ -155,6 +180,11 @@ assert_contains "$tmpdir/.planning/bases/decisions.base" 'type == "decision-log"
 
 assert_contains "$ROOT/scripts/setup.sh" "obsidian_meta.sh"
 assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_PROJECT_SLUG"
+assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_CURRENT_STATE"
+assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_CODEBASE_MAP"
+assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_BASELINE"
+assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_DOCS_INGEST"
+assert_contains "$ROOT/scripts/resolve_gsd_paths.sh" "GSD_INTEGRATION_RISKS"
 assert_contains "$ROOT/scripts/log_decision.sh" "ensure-frontmatter"
 assert_contains "$ROOT/scripts/inject_answer.sh" "ensure-frontmatter"
 assert_contains "$ROOT/scripts/summarize_gstack.sh" "ensure-frontmatter"
@@ -182,6 +212,12 @@ assert_contains "$long_frontmatter" "Body stays here."
 
 assert_contains "$ROOT/references/decisions-template.md" "type: decision-log"
 assert_contains "$ROOT/agents/gss-researcher.md" "obsidian_meta.sh"
+assert_contains "$ROOT/agents/gss-discoverer.md" "obsidian_meta.sh"
+assert_contains "$ROOT/agents/gss-discoverer.md" "CURRENT_STATE.md"
+assert_contains "$ROOT/agents/gss-discoverer.md" "CODEBASE_MAP.md"
+assert_contains "$ROOT/agents/gss-discoverer.md" "BASELINE.md"
+assert_contains "$ROOT/agents/gss-discoverer.md" "DOCS_INGEST.md"
+assert_contains "$ROOT/agents/gss-discoverer.md" "INTEGRATION_RISKS.md"
 assert_contains "$ROOT/agents/gss-gsd-runner.md" "normalize-known"
 assert_contains "$ROOT/agents/gss-reviewer.md" "ensure-frontmatter"
 assert_contains "$ROOT/agents/gss-brainstormer.md" "normalize-known"
@@ -204,6 +240,11 @@ assert_not_contains "$ROOT/agents/gss-debugger.md" "write frontmatter manually"
 
 assert_contains "$ROOT/SKILL.md" "scripts/obsidian_meta.sh"
 assert_contains "$ROOT/SKILL.md" ".planning/RESEARCH.md"
+assert_contains "$ROOT/SKILL.md" ".planning/CURRENT_STATE.md"
+assert_contains "$ROOT/SKILL.md" ".planning/CODEBASE_MAP.md"
+assert_contains "$ROOT/SKILL.md" ".planning/BASELINE.md"
+assert_contains "$ROOT/SKILL.md" ".planning/DOCS_INGEST.md"
+assert_contains "$ROOT/SKILL.md" ".planning/INTEGRATION_RISKS.md"
 assert_not_contains "$ROOT/SKILL.md" "gss-research-synthesizer"
 assert_not_contains "$ROOT/SKILL.md" "gss-roadmapper"
 assert_not_contains "$ROOT/SKILL.md" "research/STACK.md"
@@ -211,6 +252,11 @@ assert_not_contains "$ROOT/SKILL.md" "research/FEATURES.md"
 assert_not_contains "$ROOT/SKILL.md" "research/ARCHITECTURE.md"
 assert_not_contains "$ROOT/SKILL.md" "research/PITFALLS.md"
 assert_contains "$ROOT/SKILL.codex.md" "obsidian_meta.sh"
+assert_contains "$ROOT/SKILL.codex.md" ".planning/CURRENT_STATE.md"
+assert_contains "$ROOT/SKILL.codex.md" ".planning/CODEBASE_MAP.md"
+assert_contains "$ROOT/SKILL.codex.md" ".planning/BASELINE.md"
+assert_contains "$ROOT/SKILL.codex.md" ".planning/DOCS_INGEST.md"
+assert_contains "$ROOT/SKILL.codex.md" ".planning/INTEGRATION_RISKS.md"
 assert_contains "$ROOT/SKILL.codex.md" 'phases/<phase>/DESIGN_QA.md'
 assert_contains "$ROOT/SKILL.codex.md" 'DEVEX_REVIEW.md'
 assert_contains "$ROOT/SKILL.codex.md" 'DEBUG_REPORT.md'
@@ -218,6 +264,7 @@ assert_contains "$ROOT/SKILL.codex.md" 'phases/<phase>/DOCS_REPORT.md'
 assert_contains "$ROOT/README.md" ".planning/.project_slug"
 assert_contains "$ROOT/README.md" ".planning/bases/"
 assert_contains "$ROOT/README.md" ".planning/RESEARCH.md"
+assert_contains "$ROOT/README.md" ".planning/CURRENT_STATE.md"
 
 # ── Idempotency / preservation regressions ───────────────────────────────────
 idem="$(mktemp -d)"

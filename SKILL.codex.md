@@ -139,14 +139,14 @@ Use only concrete skill ids that exist in Codex.
 ## STATE MACHINE
 
 ```text
-IDLE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
-                                  ↑                ↑                                         ↕
-                                  │         (skip if no                             BLOCKED:DESIGN
-                                  │          devex_surface)                       (→ GStack routing
-                                  │                                                 → retry brainstorm)
-                                  │
-                                  └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
-                                                   NEXT_PHASE loop
+IDLE → PROJECT_INTAKE → RESEARCH → PLANNING → GSTACK_REVIEW → GSTACK_DX_REVIEW → GSTACK_DESIGN_PLAN → SP_BRAINSTORM → SP_EXECUTING
+          │                           ↑                ↑                ↑                                         ↕
+          └─ existing project         │                │         (skip if no                             BLOCKED:DESIGN
+             → PROJECT_DISCOVERY ─────┘                │          devex_surface)                       (→ GStack routing
+                                                       │                                                 → retry brainstorm)
+                                                       │
+                                                       └── GSD_DISPATCH ← GSTACK_DOCS ← GSTACK_DESIGN_QA ← GSTACK_QA
+                                                                        NEXT_PHASE loop
 
 Failure retry path:
 GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS failure → SP_DEBUGGING → SP_EXECUTING
@@ -154,12 +154,13 @@ GSTACK_QA / GSTACK_DESIGN_QA / GSTACK_DOCS failure → SP_DEBUGGING → SP_EXECU
 
 ---
 
-## PHASE 0 — RESEARCH
+## PHASE 0A — PROJECT INTAKE
 
 **Trigger:** `loop_state` is `IDLE`
 
-Pre-planning web research feeds GSD with a compact `RESEARCH.md` so it does not
-need to dispatch nested research agents.
+Save requirements and classify project mode before research. This branch keeps
+greenfield projects fast while making existing projects plan from current
+reality.
 
 Save requirements and initialize Obsidian metadata:
 ```bash
@@ -171,6 +172,79 @@ EOF
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 ```
 
+Classify project mode:
+```bash
+if [ -f .planning/ROADMAP.md ]; then
+  PROJECT_MODE="existing_project_with_planning"
+elif find . -maxdepth 2 -type f \( -name package.json -o -name pyproject.toml -o -name go.mod -o -name Cargo.toml -o -name README.md \) \
+  -not -path "./.planning/*" | head -1 | grep -q .; then
+  PROJECT_MODE="existing_project"
+else
+  PROJECT_MODE="new_project"
+fi
+
+NEXT_STATE="$([ "$PROJECT_MODE" = "new_project" ] && echo RESEARCH || echo PROJECT_DISCOVERY)"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "$NEXT_STATE" "" "" "" "$PROJECT_MODE"
+```
+
+**If `PROJECT_MODE=new_project`** → PHASE 0.
+**If `PROJECT_MODE=existing_project` or `existing_project_with_planning`** → PHASE 0B.
+
+---
+
+## PHASE 0B — PROJECT DISCOVERY
+
+**Trigger:** `loop_state` is `PROJECT_DISCOVERY`
+
+Existing projects need a factual map before research/planning. Discovery writes
+brownfield artifacts so Phase 1 creates a **delta roadmap**, not a greenfield
+roadmap.
+
+Spawn one discovery subagent. Its **initial message must begin with**:
+```text
+You are gss-discoverer.
+
+Read repository files, existing docs, manifests, tests, and existing .planning
+artifacts if present. Run obvious baseline verification commands and capture
+pass/fail summaries only. Do not implement code.
+
+Project mode: [project_mode from .planning/GSS_STATE.json]
+Requirements: .planning/REQUIREMENTS.md
+
+Write:
+- .planning/CURRENT_STATE.md
+- .planning/CODEBASE_MAP.md
+- .planning/BASELINE.md
+- .planning/DOCS_INGEST.md
+- .planning/INTEGRATION_RISKS.md
+
+Use scripts/obsidian_meta.sh to normalize metadata; do not hand-write YAML.
+
+When finished, output only:
+DISCOVERY_COMPLETE
+[3-line summary of current state, baseline, and main integration risk]
+```
+
+After `DISCOVERY_COMPLETE`:
+```bash
+ls -la .planning/CURRENT_STATE.md .planning/CODEBASE_MAP.md .planning/BASELINE.md .planning/DOCS_INGEST.md .planning/INTEGRATION_RISKS.md
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "RESEARCH"
+```
+
+→ PHASE 0
+
+---
+
+## PHASE 0 — RESEARCH
+
+**Trigger:** `loop_state` is `RESEARCH`
+
+Pre-planning web research feeds GSD with a compact `RESEARCH.md` so it does not
+need to dispatch nested research agents. For brownfield projects, research must
+validate the existing stack and integration risks from `.planning/CURRENT_STATE.md`,
+`.planning/CODEBASE_MAP.md`, `.planning/BASELINE.md`, `.planning/DOCS_INGEST.md`,
+and `.planning/INTEGRATION_RISKS.md`.
+
 Spawn one researcher subagent. Its **initial message must begin with**:
 ```text
 You are gss-researcher.
@@ -178,7 +252,14 @@ You are gss-researcher.
 Use WebSearch and WebFetch directly — you have those tools.
 Do NOT try to spawn subagents.
 
-Read .planning/REQUIREMENTS.md, gather:
+Read .planning/REQUIREMENTS.md plus brownfield discovery files if present:
+- .planning/CURRENT_STATE.md
+- .planning/CODEBASE_MAP.md
+- .planning/BASELINE.md
+- .planning/DOCS_INGEST.md
+- .planning/INTEGRATION_RISKS.md
+
+Gather:
 - Tech stack validation (best libraries/frameworks, versions, deprecations)
 - Architecture patterns (production evidence, trade-offs)
 - Implementation specifics (API/schema/auth/security/perf)
@@ -209,13 +290,21 @@ GSD handles interview, roadmap, and PLAN.md draft.
 Pre-planning research has already produced `.planning/RESEARCH.md` in Phase 0 —
 GSD MUST consume that file as research context and SKIP its own internal research
 dispatch.
+For brownfield projects, GSD MUST also consume discovery artifacts and produce a
+**delta roadmap** from current state to target state.
 
 Verify Phase 0 outputs exist:
 ```bash
+PROJECT_MODE=$(jq -r '.project_mode // "new_project"' .planning/GSS_STATE.json)
 ls -la .planning/REQUIREMENTS.md .planning/RESEARCH.md
+if [ "$PROJECT_MODE" != "new_project" ]; then
+  ls -la .planning/CURRENT_STATE.md .planning/CODEBASE_MAP.md .planning/BASELINE.md .planning/DOCS_INGEST.md .planning/INTEGRATION_RISKS.md
+fi
 ```
 
-Both files must exist. If either is missing, return to PHASE 0 — do not dispatch GSD without research.
+Required files must exist. If research is missing, return to PHASE 0. If brownfield
+discovery files are missing, return to PHASE 0B. Do not dispatch GSD without the
+right context for the project mode.
 
 Spawn one planning subagent. Its **initial message must begin with**:
 ```text
@@ -224,10 +313,22 @@ Initialize planning artifacts for this project.
 
 Requirements: .planning/REQUIREMENTS.md
 Research context: .planning/RESEARCH.md  (already produced in Phase 0)
+Project mode: [paste .planning/GSS_STATE.json project_mode]
+Brownfield context if project_mode is not new_project:
+- .planning/CURRENT_STATE.md
+- .planning/CODEBASE_MAP.md
+- .planning/BASELINE.md
+- .planning/DOCS_INGEST.md
+- .planning/INTEGRATION_RISKS.md
 
 Run the GSD workflow using the supplied research.
 SKIP GSD's internal research dispatch — RESEARCH.md is on disk and is the
 authoritative research context for this milestone.
+If project_mode=new_project, create a roadmap for the full new system.
+If project_mode is existing_project or existing_project_with_planning, create a
+delta roadmap from CURRENT_STATE/CODEBASE_MAP/BASELINE to the target in
+REQUIREMENTS.md. Preserve existing architecture unless a requirement or GStack
+decision explicitly changes it.
 Answer any AskUserQuestion gates using the requirements when possible.
 When finished, output only:
 PLANNING_DONE: [current milestone name]
@@ -242,7 +343,8 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh write-bases
 DEVEX_SURFACE="<true-or-false-from-planning-output>"
 DEVEX_RATIONALE="<one-sentence-rationale-from-planning-output>"
-bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>" "$DEVEX_SURFACE" "$DEVEX_RATIONALE"
+PROJECT_MODE="<new_project-or-existing_project-or-existing_project_with_planning>"
+bash $(cat .planning/.gss_home)/scripts/update_state.sh "GSTACK_REVIEW" "<milestone>" "$DEVEX_SURFACE" "$DEVEX_RATIONALE" "$PROJECT_MODE"
 ```
 
 Research stays in the single file `.planning/RESEARCH.md` (compatible mode); it
@@ -839,6 +941,11 @@ bash $(cat .planning/.gss_home)/scripts/checkpoint.sh --phase
 | File | Written by | Read by |
 |------|-----------|---------|
 | `REQUIREMENTS.md` | Orchestrator | Planning subagent (GSD) |
+| `CURRENT_STATE.md` | Discovery subagent | Researcher, planning subagent, GStack reviewers |
+| `CODEBASE_MAP.md` | Discovery subagent | Researcher, planning subagent, brainstorming gate |
+| `BASELINE.md` | Discovery subagent | Planning subagent, QA/debugging subagents |
+| `DOCS_INGEST.md` | Discovery subagent | Planning and docs subagents |
+| `INTEGRATION_RISKS.md` | Discovery subagent | Researcher, planning subagent, GStack reviewers |
 | `RESEARCH.md` | Researcher subagent | Planning subagent (GSD) |
 | `ROADMAP.md` | Planning subagent (GSD) | Orchestrator, review subagents |
 | `PLAN.md` (draft) | Planning subagent (GSD) | Brainstorming gate subagent |
@@ -911,6 +1018,11 @@ bash $(cat .planning/.gss_home)/scripts/obsidian_meta.sh normalize-known
 | `DECISIONS.md` | `decision-log` |
 | `DESIGN.md` | `design` |
 | `shared_context.md` | `shared-context` |
+| `CURRENT_STATE.md` | `current-state` |
+| `CODEBASE_MAP.md` | `codebase-map` |
+| `BASELINE.md` | `baseline` |
+| `DOCS_INGEST.md` | `docs-ingest` |
+| `INTEGRATION_RISKS.md` | `integration-risks` |
 | `CHECKPOINT_HISTORY.md` | `checkpoint-log` |
 | `phases/<phase>/PLAN.md` | `plan` |
 | `phases/<phase>/DECISIONS.md` | `decision-log` |

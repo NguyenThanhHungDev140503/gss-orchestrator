@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_SRC="$SCRIPT_DIR"
 REQUIRED_AGENTS=(
   gss-researcher.md
+  gss-discoverer.md
   gss-gsd-runner.md
   gss-reviewer.md
   gss-devex-reviewer.md
