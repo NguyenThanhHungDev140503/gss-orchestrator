@@ -137,6 +137,7 @@ mkdir -p "$SKILL_DEST"
 
 # Copy tất cả files, ghi đè nếu trùng (-f)
 cp -rf "$SKILL_SRC/SKILL.md"     "$SKILL_DEST/"
+cp -rf "$SKILL_SRC/subskills"    "$SKILL_DEST/" 2>/dev/null || true
 cp -rf "$SKILL_SRC/scripts"      "$SKILL_DEST/" 2>/dev/null || true
 cp -rf "$SKILL_SRC/references"   "$SKILL_DEST/" 2>/dev/null || true
 cp -rf "$SKILL_SRC/agents"       "$SKILL_DEST/" 2>/dev/null || true
