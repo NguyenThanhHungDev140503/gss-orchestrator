@@ -118,6 +118,8 @@ if [ "$MODE" = "global" ]; then
 
   # Copy core files
   cp -f "$SKILL_SRC/SKILL.md" "$DEST/"
+  cp -rf "$SKILL_SRC/subskills" "$DEST/" 2>/dev/null || true
+  cp -rf "$SKILL_SRC/subskills-codex" "$DEST/" 2>/dev/null || true
 
   # Adapt SKILL.md cho Hermes: thay path Claude Code bằng ${HERMES_SKILL_DIR}
   python3 - << PYEOF

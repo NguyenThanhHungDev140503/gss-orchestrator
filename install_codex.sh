@@ -134,8 +134,9 @@ if [ -f "$SKILL_SRC/SKILL.codex.md" ]; then
 else
   cp -f "$SKILL_SRC/SKILL.md" "$SKILL_DEST/"
 fi
-cp -rf "$SKILL_SRC/scripts"    "$SKILL_DEST/" 2>/dev/null || true
-cp -rf "$SKILL_SRC/references" "$SKILL_DEST/" 2>/dev/null || true
+cp -rf "$SKILL_SRC/subskills-codex" "$SKILL_DEST/" 2>/dev/null || true
+cp -rf "$SKILL_SRC/scripts"          "$SKILL_DEST/" 2>/dev/null || true
+cp -rf "$SKILL_SRC/references"       "$SKILL_DEST/" 2>/dev/null || true
 printf "%s\n" "$SKILL_VERSION" > "$SKILL_DEST/VERSION"
 
 # Không copy agents/ của Claude Code — Codex dùng openai.yaml khác
